@@ -472,15 +472,6 @@ export default function Monitoring() {
     return alert.type === alertFilter;
   });
 
-  const filteredLogs = logs.filter((log) => {
-    const matchesFilter = logFilter === "all" || log.level === logFilter;
-    const matchesSearch =
-      !logSearch ||
-      log.message.toLowerCase().includes(logSearch.toLowerCase()) ||
-      log.component.toLowerCase().includes(logSearch.toLowerCase());
-    return matchesFilter && matchesSearch;
-  });
-
   const overallHealth = nodes.every((node) => node.status === "healthy")
     ? "healthy"
     : nodes.some((node) => node.status === "critical")
