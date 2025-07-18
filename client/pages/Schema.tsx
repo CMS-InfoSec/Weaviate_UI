@@ -66,519 +66,346 @@ import {
   Upload,
   MoreHorizontal,
   AlertCircle,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import API_CONFIG from "@/lib/api";
 
 interface Property {
   name: string;
-  dataType: string;
+  dataType: string | string[];
   description?: string;
   tokenization?: string;
-  vectorizer?: string;
+  vectorizePropertyName?: boolean;
   indexInverted?: boolean;
   indexSearchable?: boolean;
+  moduleConfig?: any;
 }
 
 interface WeaviateClass {
-  className: string;
+  class: string;
   description?: string;
   properties: Property[];
-  vectorizer: string;
-  vectorIndexType: string;
-  objectCount: number;
-  createdAt: string;
+  vectorizer?: string;
+  vectorIndexType?: string;
+  vectorIndexConfig?: any;
+  moduleConfig?: any;
+  invertedIndexConfig?: any;
+  multiTenancyConfig?: any;
+  replicationConfig?: any;
+  shardingConfig?: any;
+}
+
+interface SchemaResponse {
+  classes: WeaviateClass[];
 }
 
 export default function Schema() {
   const { toast } = useToast();
-
-  const [classes, setClasses] = useState<WeaviateClass[]>([
-    {
-      className: "Article",
-      description: "News articles and blog posts",
-      vectorizer: "text2vec-openai",
-      vectorIndexType: "hnsw",
-      objectCount: 15420,
-      createdAt: "2024-01-15",
-      properties: [
-        {
-          name: "title",
-          dataType: "text",
-          description: "Article title",
-          tokenization: "word",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "content",
-          dataType: "text",
-          description: "Article content",
-          tokenization: "word",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "author",
-          dataType: "text",
-          description: "Article author",
-          tokenization: "field",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "publishedDate",
-          dataType: "date",
-          description: "Publication date",
-          indexInverted: true,
-          indexSearchable: false,
-        },
-        {
-          name: "category",
-          dataType: "text",
-          description: "Article category",
-          tokenization: "field",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-      ],
-    },
-    {
-      className: "Person",
-      description: "People and authors",
-      vectorizer: "text2vec-openai",
-      vectorIndexType: "hnsw",
-      objectCount: 2543,
-      createdAt: "2024-01-10",
-      properties: [
-        {
-          name: "name",
-          dataType: "text",
-          description: "Person's full name",
-          tokenization: "word",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "bio",
-          dataType: "text",
-          description: "Biography",
-          tokenization: "word",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "email",
-          dataType: "text",
-          description: "Email address",
-          tokenization: "field",
-          indexInverted: true,
-          indexSearchable: false,
-        },
-        {
-          name: "birthDate",
-          dataType: "date",
-          description: "Date of birth",
-          indexInverted: true,
-          indexSearchable: false,
-        },
-      ],
-    },
-    {
-      className: "Company",
-      description: "Companies and organizations",
-      vectorizer: "text2vec-cohere",
-      vectorIndexType: "hnsw",
-      objectCount: 891,
-      createdAt: "2024-01-12",
-      properties: [
-        {
-          name: "name",
-          dataType: "text",
-          description: "Company name",
-          tokenization: "field",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "description",
-          dataType: "text",
-          description: "Company description",
-          tokenization: "word",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "industry",
-          dataType: "text",
-          description: "Industry sector",
-          tokenization: "field",
-          indexInverted: true,
-          indexSearchable: true,
-        },
-        {
-          name: "foundedYear",
-          dataType: "int",
-          description: "Year founded",
-          indexInverted: true,
-          indexSearchable: false,
-        },
-      ],
-    },
-  ]);
-
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [classes, setClasses] = useState<WeaviateClass[]>([]);
   const [selectedClass, setSelectedClass] = useState<WeaviateClass | null>(
     null,
   );
-  const [editingClass, setEditingClass] = useState<WeaviateClass | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddClass, setShowAddClass] = useState(false);
-  const [showClassDetail, setShowClassDetail] = useState(false);
-  const [showEditClass, setShowEditClass] = useState(false);
-  const [showAddProperty, setShowAddProperty] = useState(false);
-  const [showEditProperty, setShowEditProperty] = useState(false);
-  const [showDeleteClass, setShowDeleteClass] = useState(false);
-  const [showDeleteProperty, setShowDeleteProperty] = useState(false);
-  const [showExportSchema, setShowExportSchema] = useState(false);
-  const [showImportSchema, setShowImportSchema] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
 
-  // Form states
-  const [classForm, setClassForm] = useState({
-    className: "",
-    description: "",
-    vectorizer: "",
-    vectorIndexType: "hnsw",
-  });
+  // Form states for creating new class
+  const [newClassName, setNewClassName] = useState("");
+  const [newClassDescription, setNewClassDescription] = useState("");
+  const [newClassVectorizer, setNewClassVectorizer] =
+    useState("text2vec-openai");
 
-  const [propertyForm, setPropertyForm] = useState<Property>({
-    name: "",
-    dataType: "",
-    description: "",
-    tokenization: "",
-    indexInverted: true,
-    indexSearchable: false,
-  });
+  // Fetch schema from Weaviate
+  const fetchSchema = async () => {
+    try {
+      const schema: SchemaResponse = await API_CONFIG.get("/schema");
+      setClasses(schema.classes || []);
+      setError(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch schema";
+      console.error("Schema fetch error:", errorMessage);
 
-  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
-  const [classToDelete, setClassToDelete] = useState<string | null>(null);
-  const [propertyToDelete, setPropertyToDelete] = useState<string | null>(null);
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        setError(
+          "CORS Error: Cannot connect in development mode. Showing demo data.",
+        );
+        // Fallback demo data for development
+        setClasses([
+          {
+            class: "Article",
+            description: "News articles and blog posts (Demo)",
+            vectorizer: "text2vec-openai",
+            vectorIndexType: "hnsw",
+            properties: [
+              {
+                name: "title",
+                dataType: ["text"],
+                description: "Article title",
+                tokenization: "word",
+                vectorizePropertyName: false,
+              },
+              {
+                name: "content",
+                dataType: ["text"],
+                description: "Article content",
+                tokenization: "word",
+              },
+              {
+                name: "author",
+                dataType: ["text"],
+                description: "Article author",
+              },
+              {
+                name: "publishedAt",
+                dataType: ["date"],
+                description: "Publication date",
+              },
+            ],
+          },
+          {
+            class: "Product",
+            description: "E-commerce products (Demo)",
+            vectorizer: "text2vec-transformers",
+            vectorIndexType: "hnsw",
+            properties: [
+              {
+                name: "name",
+                dataType: ["text"],
+                description: "Product name",
+              },
+              {
+                name: "description",
+                dataType: ["text"],
+                description: "Product description",
+              },
+              {
+                name: "price",
+                dataType: ["number"],
+                description: "Product price",
+              },
+            ],
+          },
+        ]);
 
-  const filteredClasses = classes.filter(
-    (cls) =>
-      cls.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cls.description?.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
-
-  // Reset form function
-  const resetClassForm = () => {
-    setClassForm({
-      className: "",
-      description: "",
-      vectorizer: "",
-      vectorIndexType: "hnsw",
-    });
-  };
-
-  const resetPropertyForm = () => {
-    setPropertyForm({
-      name: "",
-      dataType: "",
-      description: "",
-      tokenization: "",
-      indexInverted: true,
-      indexSearchable: false,
-    });
+        toast({
+          title: "Development Mode",
+          description:
+            "CORS prevents live connection. Showing demo schema data.",
+          variant: "default",
+        });
+      } else {
+        setError(errorMessage);
+        setClasses([]);
+        toast({
+          title: "Schema Error",
+          description: `Could not fetch schema: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   // Create new class
-  const handleCreateClass = () => {
-    if (!classForm.className || !classForm.vectorizer) {
+  const handleCreateClass = async () => {
+    if (!newClassName.trim()) {
       toast({
         title: "Validation Error",
-        description: "Class name and vectorizer are required",
+        description: "Class name is required",
         variant: "destructive",
       });
       return;
     }
 
-    // Check if class already exists
-    if (classes.some((cls) => cls.className === classForm.className)) {
+    try {
+      const newClass = {
+        class: newClassName,
+        description: newClassDescription,
+        vectorizer: newClassVectorizer,
+        properties: [],
+      };
+
+      // Try to create the class via API
+      await API_CONFIG.post("/schema", newClass);
+
+      // Refresh schema
+      await fetchSchema();
+
+      // Reset form
+      setNewClassName("");
+      setNewClassDescription("");
+      setNewClassVectorizer("text2vec-openai");
+      setShowCreateDialog(false);
+
       toast({
-        title: "Error",
-        description: "A class with this name already exists",
-        variant: "destructive",
+        title: "Class Created",
+        description: `Class "${newClassName}" has been created successfully.`,
       });
-      return;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create class";
+
+      if (errorMessage.includes("CORS")) {
+        // In development, just add to local state for demo
+        const demoClass: WeaviateClass = {
+          class: newClassName,
+          description: newClassDescription + " (Demo - not saved)",
+          vectorizer: newClassVectorizer,
+          vectorIndexType: "hnsw",
+          properties: [],
+        };
+
+        setClasses([...classes, demoClass]);
+        setNewClassName("");
+        setNewClassDescription("");
+        setShowCreateDialog(false);
+
+        toast({
+          title: "Demo Mode",
+          description:
+            "Class added locally (not saved to Weaviate due to CORS).",
+        });
+      } else {
+        toast({
+          title: "Creation Error",
+          description: `Could not create class: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
     }
-
-    const newClass: WeaviateClass = {
-      className: classForm.className,
-      description: classForm.description,
-      vectorizer: classForm.vectorizer,
-      vectorIndexType: classForm.vectorIndexType,
-      properties: [],
-      objectCount: 0,
-      createdAt: new Date().toISOString().split("T")[0],
-    };
-
-    setClasses([...classes, newClass]);
-    resetClassForm();
-    setShowAddClass(false);
-
-    toast({
-      title: "Success",
-      description: `Class "${newClass.className}" created successfully`,
-    });
-  };
-
-  // Edit class
-  const handleEditClass = () => {
-    if (!editingClass || !classForm.className || !classForm.vectorizer) {
-      toast({
-        title: "Validation Error",
-        description: "Class name and vectorizer are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const updatedClasses = classes.map((cls) =>
-      cls.className === editingClass.className
-        ? {
-            ...cls,
-            className: classForm.className,
-            description: classForm.description,
-            vectorizer: classForm.vectorizer,
-            vectorIndexType: classForm.vectorIndexType,
-          }
-        : cls,
-    );
-
-    setClasses(updatedClasses);
-    setEditingClass(null);
-    resetClassForm();
-    setShowEditClass(false);
-
-    toast({
-      title: "Success",
-      description: `Class "${classForm.className}" updated successfully`,
-    });
   };
 
   // Delete class
-  const handleDeleteClass = () => {
-    if (!classToDelete) return;
+  const handleDeleteClass = async (className: string) => {
+    try {
+      await API_CONFIG.delete(`/schema/${className}`);
+      await fetchSchema();
+      setShowDeleteDialog(null);
 
-    setClasses(classes.filter((cls) => cls.className !== classToDelete));
-    setClassToDelete(null);
-    setShowDeleteClass(false);
-
-    toast({
-      title: "Success",
-      description: `Class "${classToDelete}" deleted successfully`,
-    });
-  };
-
-  // Add property
-  const handleAddProperty = () => {
-    if (!selectedClass || !propertyForm.name || !propertyForm.dataType) {
       toast({
-        title: "Validation Error",
-        description: "Property name and data type are required",
-        variant: "destructive",
+        title: "Class Deleted",
+        description: `Class "${className}" has been deleted successfully.`,
       });
-      return;
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete class";
+
+      if (errorMessage.includes("CORS")) {
+        // In development, just remove from local state
+        setClasses(classes.filter((c) => c.class !== className));
+        setShowDeleteDialog(null);
+
+        toast({
+          title: "Demo Mode",
+          description:
+            "Class removed locally (not deleted from Weaviate due to CORS).",
+        });
+      } else {
+        toast({
+          title: "Deletion Error",
+          description: `Could not delete class: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
     }
-
-    // Check if property already exists
-    if (
-      selectedClass.properties.some((prop) => prop.name === propertyForm.name)
-    ) {
-      toast({
-        title: "Error",
-        description: "A property with this name already exists",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const updatedClasses = classes.map((cls) =>
-      cls.className === selectedClass.className
-        ? {
-            ...cls,
-            properties: [...cls.properties, { ...propertyForm }],
-          }
-        : cls,
-    );
-
-    const updatedSelectedClass = updatedClasses.find(
-      (cls) => cls.className === selectedClass.className,
-    );
-
-    setClasses(updatedClasses);
-    setSelectedClass(updatedSelectedClass || null);
-    resetPropertyForm();
-    setShowAddProperty(false);
-
-    toast({
-      title: "Success",
-      description: `Property "${propertyForm.name}" added successfully`,
-    });
-  };
-
-  // Edit property
-  const handleEditProperty = () => {
-    if (
-      !selectedClass ||
-      !editingProperty ||
-      !propertyForm.name ||
-      !propertyForm.dataType
-    ) {
-      toast({
-        title: "Validation Error",
-        description: "Property name and data type are required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const updatedClasses = classes.map((cls) =>
-      cls.className === selectedClass.className
-        ? {
-            ...cls,
-            properties: cls.properties.map((prop) =>
-              prop.name === editingProperty.name ? { ...propertyForm } : prop,
-            ),
-          }
-        : cls,
-    );
-
-    const updatedSelectedClass = updatedClasses.find(
-      (cls) => cls.className === selectedClass.className,
-    );
-
-    setClasses(updatedClasses);
-    setSelectedClass(updatedSelectedClass || null);
-    setEditingProperty(null);
-    resetPropertyForm();
-    setShowEditProperty(false);
-
-    toast({
-      title: "Success",
-      description: `Property "${propertyForm.name}" updated successfully`,
-    });
-  };
-
-  // Delete property
-  const handleDeleteProperty = () => {
-    if (!selectedClass || !propertyToDelete) return;
-
-    const updatedClasses = classes.map((cls) =>
-      cls.className === selectedClass.className
-        ? {
-            ...cls,
-            properties: cls.properties.filter(
-              (prop) => prop.name !== propertyToDelete,
-            ),
-          }
-        : cls,
-    );
-
-    const updatedSelectedClass = updatedClasses.find(
-      (cls) => cls.className === selectedClass.className,
-    );
-
-    setClasses(updatedClasses);
-    setSelectedClass(updatedSelectedClass || null);
-    setPropertyToDelete(null);
-    setShowDeleteProperty(false);
-
-    toast({
-      title: "Success",
-      description: `Property "${propertyToDelete}" deleted successfully`,
-    });
   };
 
   // Export schema
   const handleExportSchema = () => {
-    const schemaData = {
-      classes: classes,
-      exportedAt: new Date().toISOString(),
-      version: "1.0",
-    };
-
+    const schemaData = { classes };
     const blob = new Blob([JSON.stringify(schemaData, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `weaviate-schema-${new Date().toISOString().split("T")[0]}.json`;
-    document.body.appendChild(a);
+    a.download = "weaviate-schema.json";
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
     toast({
-      title: "Success",
-      description: "Schema exported successfully",
+      title: "Schema Exported",
+      description: "Schema has been exported successfully.",
     });
   };
 
-  // Copy class to clipboard
-  const handleCopyClass = (cls: WeaviateClass) => {
-    navigator.clipboard.writeText(JSON.stringify(cls, null, 2));
+  // Refresh schema
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchSchema();
+    setRefreshing(false);
+
     toast({
-      title: "Success",
-      description: `Class "${cls.className}" copied to clipboard`,
+      title: "Schema Refreshed",
+      description: "Schema data has been updated from Weaviate.",
     });
   };
 
-  // Open edit dialogs
-  const openEditClassDialog = (cls: WeaviateClass) => {
-    setEditingClass(cls);
-    setClassForm({
-      className: cls.className,
-      description: cls.description || "",
-      vectorizer: cls.vectorizer,
-      vectorIndexType: cls.vectorIndexType,
-    });
-    setShowEditClass(true);
-  };
+  // Initial load
+  useEffect(() => {
+    const loadSchema = async () => {
+      setLoading(true);
+      await fetchSchema();
+      setLoading(false);
+    };
 
-  const openEditPropertyDialog = (property: Property) => {
-    setEditingProperty(property);
-    setPropertyForm({ ...property });
-    setShowEditProperty(true);
-  };
+    loadSchema();
+  }, []);
 
-  const getVectorizerBadgeColor = (vectorizer: string) => {
-    switch (vectorizer) {
-      case "text2vec-openai":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "text2vec-cohere":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      case "text2vec-huggingface":
-        return "bg-orange-100 text-orange-800 border-orange-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
+  // Filter classes based on search
+  const filteredClasses = classes.filter(
+    (cls) =>
+      cls.class.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (cls.description &&
+        cls.description.toLowerCase().includes(searchTerm.toLowerCase())),
+  );
 
-  const getDataTypeBadgeColor = (dataType: string) => {
-    switch (dataType) {
+  const getDataTypeColor = (dataType: string | string[]) => {
+    const typeStr = Array.isArray(dataType) ? dataType[0] : dataType;
+    switch (typeStr) {
       case "text":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "int":
+        return "bg-blue-100 text-blue-800";
       case "number":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "date":
-        return "bg-purple-100 text-purple-800 border-purple-200";
+      case "int":
+        return "bg-green-100 text-green-800";
       case "boolean":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+        return "bg-purple-100 text-purple-800";
+      case "date":
+        return "bg-orange-100 text-orange-800";
+      case "uuid":
+        return "bg-gray-100 text-gray-800";
       default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
+        return "bg-gray-100 text-gray-800";
     }
   };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <div>
+                <h2 className="text-lg font-medium">Loading Schema</h2>
+                <p className="text-muted-foreground">
+                  Fetching schema from Weaviate instance...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -586,852 +413,324 @@ export default function Schema() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold tracking-tight">
               Schema Management
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage Weaviate classes, properties, and schema configuration
+            <p className="text-muted-foreground">
+              Manage classes and properties in your Weaviate schema
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportSchema}>
-              <Download className="h-4 w-4 mr-2" />
-              Export Schema
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
+              Refresh
             </Button>
-            <Dialog open={showAddClass} onOpenChange={setShowAddClass}>
+            <Button onClick={handleExportSchema} variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button>
+                <Button size="sm">
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Class
+                  Create Class
                 </Button>
               </DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Create New Class</DialogTitle>
                   <DialogDescription>
-                    Define a new class schema with properties and configuration
+                    Define a new class in your Weaviate schema
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="className">
-                        Class Name <span className="text-destructive">*</span>
-                      </Label>
-                      <Input
-                        id="className"
-                        value={classForm.className}
-                        onChange={(e) =>
-                          setClassForm({
-                            ...classForm,
-                            className: e.target.value,
-                          })
-                        }
-                        placeholder="e.g., Article"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="vectorizer">
-                        Vectorizer <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={classForm.vectorizer}
-                        onValueChange={(value) =>
-                          setClassForm({ ...classForm, vectorizer: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vectorizer" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="text2vec-openai">
-                            text2vec-openai
-                          </SelectItem>
-                          <SelectItem value="text2vec-cohere">
-                            text2vec-cohere
-                          </SelectItem>
-                          <SelectItem value="text2vec-huggingface">
-                            text2vec-huggingface
-                          </SelectItem>
-                          <SelectItem value="none">None</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="className">Class Name</Label>
+                    <Input
+                      id="className"
+                      value={newClassName}
+                      onChange={(e) => setNewClassName(e.target.value)}
+                      placeholder="Article"
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="vectorIndexType">Vector Index Type</Label>
+                    <Label htmlFor="classDescription">Description</Label>
+                    <Textarea
+                      id="classDescription"
+                      value={newClassDescription}
+                      onChange={(e) => setNewClassDescription(e.target.value)}
+                      placeholder="Description of this class..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vectorizer">Vectorizer</Label>
                     <Select
-                      value={classForm.vectorIndexType}
-                      onValueChange={(value) =>
-                        setClassForm({ ...classForm, vectorIndexType: value })
-                      }
+                      value={newClassVectorizer}
+                      onValueChange={setNewClassVectorizer}
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="hnsw">HNSW</SelectItem>
-                        <SelectItem value="flat">Flat</SelectItem>
+                        <SelectItem value="text2vec-openai">
+                          text2vec-openai
+                        </SelectItem>
+                        <SelectItem value="text2vec-transformers">
+                          text2vec-transformers
+                        </SelectItem>
+                        <SelectItem value="text2vec-cohere">
+                          text2vec-cohere
+                        </SelectItem>
+                        <SelectItem value="none">none</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={classForm.description}
-                      onChange={(e) =>
-                        setClassForm({
-                          ...classForm,
-                          description: e.target.value,
-                        })
-                      }
-                      placeholder="Describe this class..."
-                    />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddClass(false);
-                        resetClassForm();
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateClass}>Create Class</Button>
-                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateClass}>Create Class</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search classes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
+        {error && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <span className="text-yellow-700 font-medium">
+                  Development Mode
+                </span>
+              </div>
+              <p className="text-yellow-600 mt-2 text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Search and Stats */}
+        <div className="flex items-center justify-between">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search classes..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {filteredClasses.length} of {classes.length} classes
+          </div>
         </div>
 
-        {/* Class List */}
+        {/* Classes Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Schema Classes ({filteredClasses.length})
+            <CardTitle className="flex items-center">
+              <Database className="h-5 w-5 mr-2" />
+              Schema Classes
             </CardTitle>
             <CardDescription>
               All classes defined in your Weaviate schema
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Class Name</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead>Vectorizer</TableHead>
-                  <TableHead>Properties</TableHead>
-                  <TableHead>Objects</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredClasses.map((cls) => (
-                  <TableRow key={cls.className}>
-                    <TableCell className="font-medium">
-                      {cls.className}
-                    </TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {cls.description || "-"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={getVectorizerBadgeColor(cls.vectorizer)}
-                      >
-                        {cls.vectorizer}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{cls.properties.length}</TableCell>
-                    <TableCell>{cls.objectCount.toLocaleString()}</TableCell>
-                    <TableCell>{cls.createdAt}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedClass(cls);
-                              setShowClassDetail(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openEditClassDialog(cls)}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Class
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleCopyClass(cls)}
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy to Clipboard
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => {
-                              setClassToDelete(cls.className);
-                              setShowDeleteClass(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Class
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {filteredClasses.length === 0 && (
+            {filteredClasses.length === 0 ? (
               <div className="text-center py-8">
-                <Database className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No classes found</h3>
-                <p className="text-muted-foreground">
+                <Database className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Classes Found</h3>
+                <p className="text-muted-foreground mb-4">
                   {searchTerm
-                    ? "Try adjusting your search criteria"
-                    : "Create your first class to get started"}
+                    ? "No classes match your search."
+                    : "Your schema is empty."}
                 </p>
+                {!searchTerm && (
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Class
+                  </Button>
+                )}
               </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Class Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Properties</TableHead>
+                    <TableHead>Vectorizer</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredClasses.map((cls) => (
+                    <TableRow key={cls.class}>
+                      <TableCell className="font-medium">{cls.class}</TableCell>
+                      <TableCell className="max-w-xs truncate">
+                        {cls.description || "No description"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {cls.properties.slice(0, 3).map((prop) => (
+                            <Badge
+                              key={prop.name}
+                              variant="outline"
+                              className={getDataTypeColor(prop.dataType)}
+                            >
+                              {prop.name}
+                            </Badge>
+                          ))}
+                          {cls.properties.length > 3 && (
+                            <Badge variant="outline">
+                              +{cls.properties.length - 3} more
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">
+                          {cls.vectorizer || "none"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => setSelectedClass(cls)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Class
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => setShowDeleteDialog(cls.class)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Class
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
 
-        {/* Class Detail Dialog */}
-        <Dialog open={showClassDetail} onOpenChange={setShowClassDetail}>
-          <DialogContent className="max-w-5xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                {selectedClass?.className}
-              </DialogTitle>
-              <DialogDescription>
-                {selectedClass?.description || "No description available"}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedClass && (
-              <div className="space-y-6">
-                {/* Class Info */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Class Details Dialog */}
+        {selectedClass && (
+          <Dialog
+            open={!!selectedClass}
+            onOpenChange={() => setSelectedClass(null)}
+          >
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Class Details: {selectedClass.class}</DialogTitle>
+                <DialogDescription>
+                  {selectedClass.description || "No description available"}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm font-medium">Vectorizer</Label>
-                    <Badge
-                      className={getVectorizerBadgeColor(
-                        selectedClass.vectorizer,
-                      )}
-                    >
-                      {selectedClass.vectorizer}
-                    </Badge>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Vector Index</Label>
-                    <p className="text-sm">{selectedClass.vectorIndexType}</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium">Object Count</Label>
-                    <p className="text-sm font-bold">
-                      {selectedClass.objectCount.toLocaleString()}
+                    <Label>Vectorizer</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedClass.vectorizer || "none"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium">Created</Label>
-                    <p className="text-sm">{selectedClass.createdAt}</p>
+                    <Label>Vector Index Type</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedClass.vectorIndexType || "hnsw"}
+                    </p>
                   </div>
                 </div>
 
-                {/* Properties */}
                 <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold">Properties</h3>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        resetPropertyForm();
-                        setShowAddProperty(true);
-                      }}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Property
-                    </Button>
-                  </div>
-
-                  <Card>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Property Name</TableHead>
-                            <TableHead>Data Type</TableHead>
-                            <TableHead>Tokenization</TableHead>
-                            <TableHead>Indexed</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead className="text-right">
-                              Actions
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedClass.properties.map((property) => (
-                            <TableRow key={property.name}>
-                              <TableCell className="font-medium">
-                                {property.name}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  className={getDataTypeBadgeColor(
-                                    property.dataType,
-                                  )}
-                                >
-                                  {property.dataType}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                {property.tokenization || "-"}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  {property.indexInverted && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      Inverted
-                                    </Badge>
-                                  )}
-                                  {property.indexSearchable && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      Searchable
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell className="max-w-xs truncate">
-                                {property.description || "-"}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() =>
-                                      openEditPropertyDialog(property)
-                                    }
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() => {
-                                      setPropertyToDelete(property.name);
-                                      setShowDeleteProperty(true);
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-
-                      {selectedClass.properties.length === 0 && (
-                        <div className="text-center py-8">
-                          <AlertCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                          <h3 className="text-lg font-semibold mb-2">
-                            No properties defined
-                          </h3>
-                          <p className="text-muted-foreground mb-4">
-                            Add properties to define the structure of this class
-                          </p>
-                          <Button
-                            onClick={() => {
-                              resetPropertyForm();
-                              setShowAddProperty(true);
-                            }}
+                  <Label>Properties ({selectedClass.properties.length})</Label>
+                  <div className="mt-2 space-y-2 max-h-64 overflow-y-auto">
+                    {selectedClass.properties.map((prop) => (
+                      <div key={prop.name} className="p-3 border rounded">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">{prop.name}</span>
+                          <Badge
+                            variant="outline"
+                            className={getDataTypeColor(prop.dataType)}
                           >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Add First Property
-                          </Button>
+                            {Array.isArray(prop.dataType)
+                              ? prop.dataType.join(", ")
+                              : prop.dataType}
+                          </Badge>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowClassDetail(false)}
-                  >
-                    Close
-                  </Button>
-                  <Button onClick={() => openEditClassDialog(selectedClass)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Class
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Class Dialog */}
-        <Dialog open={showEditClass} onOpenChange={setShowEditClass}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Class</DialogTitle>
-              <DialogDescription>
-                Update the class configuration and properties
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="editClassName">
-                    Class Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="editClassName"
-                    value={classForm.className}
-                    onChange={(e) =>
-                      setClassForm({ ...classForm, className: e.target.value })
-                    }
-                    placeholder="e.g., Article"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editVectorizer">
-                    Vectorizer <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={classForm.vectorizer}
-                    onValueChange={(value) =>
-                      setClassForm({ ...classForm, vectorizer: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select vectorizer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text2vec-openai">
-                        text2vec-openai
-                      </SelectItem>
-                      <SelectItem value="text2vec-cohere">
-                        text2vec-cohere
-                      </SelectItem>
-                      <SelectItem value="text2vec-huggingface">
-                        text2vec-huggingface
-                      </SelectItem>
-                      <SelectItem value="none">None</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editVectorIndexType">Vector Index Type</Label>
-                <Select
-                  value={classForm.vectorIndexType}
-                  onValueChange={(value) =>
-                    setClassForm({ ...classForm, vectorIndexType: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="hnsw">HNSW</SelectItem>
-                    <SelectItem value="flat">Flat</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="editDescription">Description</Label>
-                <Textarea
-                  id="editDescription"
-                  value={classForm.description}
-                  onChange={(e) =>
-                    setClassForm({ ...classForm, description: e.target.value })
-                  }
-                  placeholder="Describe this class..."
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditClass(false);
-                    setEditingClass(null);
-                    resetClassForm();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleEditClass}>Save Changes</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Add Property Dialog */}
-        <Dialog open={showAddProperty} onOpenChange={setShowAddProperty}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Add Property</DialogTitle>
-              <DialogDescription>
-                Define a new property for the {selectedClass?.className} class
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="propertyName">
-                    Property Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="propertyName"
-                    value={propertyForm.name}
-                    onChange={(e) =>
-                      setPropertyForm({ ...propertyForm, name: e.target.value })
-                    }
-                    placeholder="e.g., title"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="propertyDataType">
-                    Data Type <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={propertyForm.dataType}
-                    onValueChange={(value) =>
-                      setPropertyForm({ ...propertyForm, dataType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select data type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text</SelectItem>
-                      <SelectItem value="int">Integer</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="boolean">Boolean</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="uuid">UUID</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {propertyForm.dataType === "text" && (
-                <div className="space-y-2">
-                  <Label htmlFor="propertyTokenization">Tokenization</Label>
-                  <Select
-                    value={propertyForm.tokenization}
-                    onValueChange={(value) =>
-                      setPropertyForm({ ...propertyForm, tokenization: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select tokenization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="word">Word</SelectItem>
-                      <SelectItem value="field">Field</SelectItem>
-                      <SelectItem value="whitespace">Whitespace</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="propertyDescription">Description</Label>
-                <Textarea
-                  id="propertyDescription"
-                  value={propertyForm.description}
-                  onChange={(e) =>
-                    setPropertyForm({
-                      ...propertyForm,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Describe this property..."
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label>Indexing Options</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="indexInverted"
-                      checked={propertyForm.indexInverted}
-                      onCheckedChange={(checked) =>
-                        setPropertyForm({
-                          ...propertyForm,
-                          indexInverted: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="indexInverted" className="text-sm">
-                      Enable inverted index (for filtering)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="indexSearchable"
-                      checked={propertyForm.indexSearchable}
-                      onCheckedChange={(checked) =>
-                        setPropertyForm({
-                          ...propertyForm,
-                          indexSearchable: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="indexSearchable" className="text-sm">
-                      Enable searchable index (for BM25 search)
-                    </Label>
+                        {prop.description && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {prop.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+        )}
 
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowAddProperty(false);
-                    resetPropertyForm();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleAddProperty}>Add Property</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Property Dialog */}
-        <Dialog open={showEditProperty} onOpenChange={setShowEditProperty}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Property</DialogTitle>
-              <DialogDescription>
-                Update the property configuration
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="editPropertyName">
-                    Property Name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="editPropertyName"
-                    value={propertyForm.name}
-                    onChange={(e) =>
-                      setPropertyForm({ ...propertyForm, name: e.target.value })
-                    }
-                    placeholder="e.g., title"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="editPropertyDataType">
-                    Data Type <span className="text-destructive">*</span>
-                  </Label>
-                  <Select
-                    value={propertyForm.dataType}
-                    onValueChange={(value) =>
-                      setPropertyForm({ ...propertyForm, dataType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select data type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="text">Text</SelectItem>
-                      <SelectItem value="int">Integer</SelectItem>
-                      <SelectItem value="number">Number</SelectItem>
-                      <SelectItem value="boolean">Boolean</SelectItem>
-                      <SelectItem value="date">Date</SelectItem>
-                      <SelectItem value="uuid">UUID</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {propertyForm.dataType === "text" && (
-                <div className="space-y-2">
-                  <Label htmlFor="editPropertyTokenization">Tokenization</Label>
-                  <Select
-                    value={propertyForm.tokenization}
-                    onValueChange={(value) =>
-                      setPropertyForm({ ...propertyForm, tokenization: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select tokenization" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="word">Word</SelectItem>
-                      <SelectItem value="field">Field</SelectItem>
-                      <SelectItem value="whitespace">Whitespace</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <Label htmlFor="editPropertyDescription">Description</Label>
-                <Textarea
-                  id="editPropertyDescription"
-                  value={propertyForm.description}
-                  onChange={(e) =>
-                    setPropertyForm({
-                      ...propertyForm,
-                      description: e.target.value,
-                    })
-                  }
-                  placeholder="Describe this property..."
-                />
-              </div>
-
-              <div className="space-y-3">
-                <Label>Indexing Options</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="editIndexInverted"
-                      checked={propertyForm.indexInverted}
-                      onCheckedChange={(checked) =>
-                        setPropertyForm({
-                          ...propertyForm,
-                          indexInverted: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="editIndexInverted" className="text-sm">
-                      Enable inverted index (for filtering)
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="editIndexSearchable"
-                      checked={propertyForm.indexSearchable}
-                      onCheckedChange={(checked) =>
-                        setPropertyForm({
-                          ...propertyForm,
-                          indexSearchable: checked as boolean,
-                        })
-                      }
-                    />
-                    <Label htmlFor="editIndexSearchable" className="text-sm">
-                      Enable searchable index (for BM25 search)
-                    </Label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowEditProperty(false);
-                    setEditingProperty(null);
-                    resetPropertyForm();
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleEditProperty}>Save Changes</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Class Confirmation */}
-        <AlertDialog open={showDeleteClass} onOpenChange={setShowDeleteClass}>
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog
+          open={!!showDeleteDialog}
+          onOpenChange={() => setShowDeleteDialog(null)}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Delete Class</AlertDialogTitle>
               <AlertDialogDescription>
-                Are you sure you want to delete the class "{classToDelete}"?
-                This will also delete all{" "}
-                {classes
-                  .find((c) => c.className === classToDelete)
-                  ?.objectCount.toLocaleString() || 0}{" "}
-                objects in this class. This action cannot be undone.
+                Are you sure you want to delete the class "{showDeleteDialog}"?
+                This action cannot be undone and will remove all associated
+                data.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setClassToDelete(null)}>
-                Cancel
-              </AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
-                onClick={handleDeleteClass}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() =>
+                  showDeleteDialog && handleDeleteClass(showDeleteDialog)
+                }
+                className="bg-red-600 hover:bg-red-700"
               >
                 Delete Class
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-
-        {/* Delete Property Confirmation */}
-        <AlertDialog
-          open={showDeleteProperty}
-          onOpenChange={setShowDeleteProperty}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Property</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete the property "{propertyToDelete}
-                "? This will remove the property from all existing objects in
-                this class. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setPropertyToDelete(null)}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteProperty}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete Property
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
