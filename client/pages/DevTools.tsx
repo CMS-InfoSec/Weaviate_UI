@@ -290,28 +290,25 @@ export default function DevTools() {
     setResponseData("");
     setResponseStatus(null);
 
-    // Simulate API request
-    setTimeout(() => {
-      const mockResponse = {
-        objects: [
-          {
-            id: "36ddd591-2dee-4e7e-a3cc-eb86d30a4303",
-            class: "Article",
-            properties: {
-              title: "Sample Article",
-              content: "This is a sample article content...",
-              author: "John Doe",
-              publishedAt: "2024-01-15T10:00:00Z",
-            },
-            vector: [0.1, 0.2, 0.3, 0.4, 0.5],
-          },
-        ],
-        totalResults: 1,
-      };
+    try {
+      let response;
+      let status = 200;
 
-      setResponseData(JSON.stringify(mockResponse, null, 2));
-      setResponseStatus(200);
-      setLoading(false);
+      // Make actual API request
+      if (selectedMethod === "GET") {
+        response = await API_CONFIG.get(apiEndpoint);
+      } else if (selectedMethod === "POST") {
+        const body = requestBody ? JSON.parse(requestBody) : {};
+        response = await API_CONFIG.post(apiEndpoint, body);
+      } else if (selectedMethod === "PUT") {
+        const body = requestBody ? JSON.parse(requestBody) : {};
+        response = await API_CONFIG.put(apiEndpoint, body);
+      } else if (selectedMethod === "DELETE") {
+        response = await API_CONFIG.delete(apiEndpoint);
+      }
+
+      setResponseData(JSON.stringify(response, null, 2));
+      setResponseStatus(status);
 
       // Add to history
       const historyEntry: QueryHistory = {
@@ -329,7 +326,57 @@ export default function DevTools() {
         title: "API Request Successful",
         description: "Request completed successfully",
       });
-    }, 1000);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Request failed";
+
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        // Demo response for CORS issues
+        const mockResponse = {
+          error: "CORS Error in Development",
+          message: "This would work in production deployment",
+          demo_data: {
+            endpoint: apiEndpoint,
+            method: selectedMethod,
+            note: "Real API response would appear here",
+          },
+        };
+
+        setResponseData(JSON.stringify(mockResponse, null, 2));
+        setResponseStatus(503);
+
+        toast({
+          title: "Development Mode",
+          description: "CORS prevents live API calls. Showing demo response.",
+        });
+      } else {
+        setResponseData(JSON.stringify({ error: errorMessage }, null, 2));
+        setResponseStatus(500);
+
+        toast({
+          title: "API Request Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+
+      // Add error to history
+      const historyEntry: QueryHistory = {
+        id: Date.now().toString(),
+        type: "rest",
+        method: selectedMethod,
+        endpoint: apiEndpoint,
+        query: `${selectedMethod} ${apiEndpoint}`,
+        timestamp: new Date().toISOString(),
+        status: "error",
+      };
+      setQueryHistory([historyEntry, ...queryHistory]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleGraphqlQuery = async () => {
