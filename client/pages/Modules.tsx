@@ -527,28 +527,6 @@ export default function Modules() {
                                   <Info className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    handleToggleModule(module.name)
-                                  }
-                                >
-                                  {module.enabled ? (
-                                    <>
-                                      <Square className="h-4 w-4 mr-2" />
-                                      Disable
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Play className="h-4 w-4 mr-2" />
-                                      Enable
-                                    </>
-                                  )}
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem>
-                                  <Settings className="h-4 w-4 mr-2" />
-                                  Configure
-                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
