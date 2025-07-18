@@ -341,24 +341,44 @@ export default function ConnectionSettings({
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Current Connection */}
-          <div className="p-4 bg-muted rounded-lg">
-            <h3 className="font-medium mb-2">Current Connection</h3>
-            {profiles.find((p) => p.isDefault) ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">
-                    {profiles.find((p) => p.isDefault)?.name}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {profiles.find((p) => p.isDefault)?.endpoint}
-                  </p>
+          {/* Quick Connection Switcher */}
+          <div className="space-y-3">
+            <h3 className="font-medium">Quick Switch</h3>
+            <div className="grid grid-cols-1 gap-2">
+              {profiles.map((profile) => (
+                <div
+                  key={profile.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                    profile.isDefault
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:bg-muted"
+                  }`}
+                  onClick={() => !profile.isDefault && setAsDefault(profile.id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      {getStatusIcon(profile.status)}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">
+                            {profile.name}
+                          </span>
+                          {profile.isDefault && (
+                            <Badge variant="default" className="text-xs">
+                              Active
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {profile.endpoint}
+                        </div>
+                      </div>
+                    </div>
+                    {getStatusBadge(profile.status)}
+                  </div>
                 </div>
-                {getStatusBadge(profiles.find((p) => p.isDefault)?.status)}
-              </div>
-            ) : (
-              <p className="text-muted-foreground">No default connection set</p>
-            )}
+              ))}
+            </div>
           </div>
 
           {/* Connection Profiles */}
