@@ -420,9 +420,43 @@ export default function Monitoring() {
       ? "critical"
       : "warning";
 
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <div>
+                <h2 className="text-lg font-medium">Loading Monitoring Data</h2>
+                <p className="text-muted-foreground">
+                  Fetching cluster health from Weaviate instance...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout>
       <div className="space-y-6">
+        {error && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <span className="text-yellow-700 font-medium">
+                  Development Mode
+                </span>
+              </div>
+              <p className="text-yellow-600 mt-2 text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
