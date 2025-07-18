@@ -16,418 +16,293 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Link as LinkIcon,
-  Plus,
   Search,
-  Trash2,
-  Eye,
   ArrowRight,
-  ArrowLeft,
   Network,
   FileText,
-  User,
-  Building,
-  MoreHorizontal,
-  ExternalLink,
-  Filter,
   RefreshCw,
+  Loader2,
+  AlertCircle,
+  Info,
 } from "lucide-react";
-import { useState } from "react";
-
-interface WeaviateObject {
-  id: string;
-  className: string;
-  properties: Record<string, any>;
-  createdAt: string;
-}
-
-interface Reference {
-  id: string;
-  fromObject: WeaviateObject;
-  toObject: WeaviateObject;
-  propertyName: string;
-  direction: "outgoing" | "incoming";
-  createdAt: string;
-  beacon: string;
-}
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import API_CONFIG from "@/lib/api";
 
 interface ReferenceProperty {
   name: string;
-  dataType: string;
-  targetClass: string;
+  dataType: string[];
+  targetClass?: string;
   description?: string;
 }
 
 interface ClassSchema {
-  className: string;
-  referenceProperties: ReferenceProperty[];
+  class: string;
+  properties: Array<{
+    name: string;
+    dataType: string | string[];
+    description?: string;
+  }>;
+}
+
+interface ObjectWithReferences {
+  id: string;
+  class: string;
+  properties: Record<string, any>;
+  references?: Array<{
+    property: string;
+    target: string;
+    targetClass: string;
+  }>;
 }
 
 export default function References() {
   const { toast } = useToast();
-
-  // Mock data for demonstration
-  const [objects] = useState<WeaviateObject[]>([
-    {
-      id: "00000000-0000-0000-0000-000000000001",
-      className: "Article",
-      properties: {
-        title: "Introduction to Vector Databases",
-        content: "Vector databases are becoming increasingly important...",
-      },
-      createdAt: "2024-01-15T10:30:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000003",
-      className: "Person",
-      properties: {
-        name: "John Smith",
-        bio: "Technology writer and AI enthusiast...",
-      },
-      createdAt: "2024-01-08T12:00:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000004",
-      className: "Company",
-      properties: {
-        name: "TechCorp Inc.",
-        description: "Leading technology company...",
-      },
-      createdAt: "2024-01-05T16:45:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000005",
-      className: "Person",
-      properties: {
-        name: "Jane Doe",
-        bio: "Machine learning researcher...",
-      },
-      createdAt: "2024-01-03T09:30:00Z",
-    },
-  ]);
-
-  const [schemas] = useState<ClassSchema[]>([
-    {
-      className: "Article",
-      referenceProperties: [
-        {
-          name: "author",
-          dataType: "reference",
-          targetClass: "Person",
-          description: "The author of the article",
-        },
-        {
-          name: "publisher",
-          dataType: "reference",
-          targetClass: "Company",
-          description: "The publishing company",
-        },
-      ],
-    },
-    {
-      className: "Person",
-      referenceProperties: [
-        {
-          name: "employer",
-          dataType: "reference",
-          targetClass: "Company",
-          description: "Current employer",
-        },
-        {
-          name: "articles",
-          dataType: "reference",
-          targetClass: "Article",
-          description: "Written articles",
-        },
-      ],
-    },
-    {
-      className: "Company",
-      referenceProperties: [
-        {
-          name: "employees",
-          dataType: "reference",
-          targetClass: "Person",
-          description: "Company employees",
-        },
-        {
-          name: "publications",
-          dataType: "reference",
-          targetClass: "Article",
-          description: "Published articles",
-        },
-      ],
-    },
-  ]);
-
-  const [references, setReferences] = useState<Reference[]>([
-    {
-      id: "ref-001",
-      fromObject: objects[0], // Article
-      toObject: objects[1], // John Smith
-      propertyName: "author",
-      direction: "outgoing",
-      createdAt: "2024-01-15T10:30:00Z",
-      beacon:
-        "weaviate://localhost/Person/00000000-0000-0000-0000-000000000003",
-    },
-    {
-      id: "ref-002",
-      fromObject: objects[0], // Article
-      toObject: objects[2], // TechCorp
-      propertyName: "publisher",
-      direction: "outgoing",
-      createdAt: "2024-01-15T10:30:00Z",
-      beacon:
-        "weaviate://localhost/Company/00000000-0000-0000-0000-000000000004",
-    },
-    {
-      id: "ref-003",
-      fromObject: objects[1], // John Smith
-      toObject: objects[2], // TechCorp
-      propertyName: "employer",
-      direction: "outgoing",
-      createdAt: "2024-01-08T12:00:00Z",
-      beacon:
-        "weaviate://localhost/Company/00000000-0000-0000-0000-000000000004",
-    },
-    {
-      id: "ref-004",
-      fromObject: objects[3], // Jane Doe
-      toObject: objects[2], // TechCorp
-      propertyName: "employer",
-      direction: "outgoing",
-      createdAt: "2024-01-03T09:30:00Z",
-      beacon:
-        "weaviate://localhost/Company/00000000-0000-0000-0000-000000000004",
-    },
-  ]);
-
-  const [selectedObject, setSelectedObject] = useState<string>("all");
-  const [selectedClass, setSelectedClass] = useState<string>("all");
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [schemas, setSchemas] = useState<ClassSchema[]>([]);
+  const [objectsWithReferences, setObjectsWithReferences] = useState<
+    ObjectWithReferences[]
+  >([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [showAddReference, setShowAddReference] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [referenceToDelete, setReferenceToDelete] = useState<string | null>(
-    null,
-  );
 
-  // Form state for adding references
-  const [referenceForm, setReferenceForm] = useState({
-    fromObjectId: "",
-    propertyName: "",
-    toObjectId: "",
-  });
+  // Fetch schema and objects with references
+  const fetchReferenceData = async () => {
+    try {
+      // Fetch schema
+      const schema = await API_CONFIG.get("/schema");
+      const schemaClasses = schema.classes || [];
+      setSchemas(schemaClasses);
 
-  // Filter references based on selected filters and search
-  const filteredReferences = references.filter((ref) => {
-    const matchesObject =
-      selectedObject === "all" ||
-      ref.fromObject.id === selectedObject ||
-      ref.toObject.id === selectedObject;
+      // Find reference properties in schema
+      const referenceProperties: ReferenceProperty[] = [];
+      schemaClasses.forEach((cls: any) => {
+        cls.properties?.forEach((prop: any) => {
+          if (
+            Array.isArray(prop.dataType) &&
+            prop.dataType.some(
+              (type: string) =>
+                type !== "text" &&
+                type !== "number" &&
+                type !== "boolean" &&
+                type !== "date",
+            )
+          ) {
+            referenceProperties.push({
+              name: prop.name,
+              dataType: prop.dataType,
+              targetClass: prop.dataType.find(
+                (type: string) =>
+                  type !== "text" &&
+                  type !== "number" &&
+                  type !== "boolean" &&
+                  type !== "date",
+              ),
+              description: prop.description,
+            });
+          }
+        });
+      });
 
-    const matchesClass =
-      selectedClass === "all" ||
-      ref.fromObject.className === selectedClass ||
-      ref.toObject.className === selectedClass;
+      // Fetch objects that might have references
+      const objects = await API_CONFIG.get("/objects?limit=50");
+      const objectsData = objects.objects || [];
 
-    const matchesSearch =
-      searchTerm === "" ||
-      ref.propertyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ref.fromObject.properties.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      ref.fromObject.properties.title
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      ref.toObject.properties.name
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      ref.toObject.properties.title
-        ?.toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      // Process objects to extract reference information
+      const processedObjects: ObjectWithReferences[] = objectsData
+        .map((obj: any) => {
+          const references: Array<{
+            property: string;
+            target: string;
+            targetClass: string;
+          }> = [];
 
-    return matchesObject && matchesClass && matchesSearch;
-  });
+          // Check object properties for references
+          Object.entries(obj.properties || {}).forEach(([key, value]) => {
+            if (value && typeof value === "object" && value.beacon) {
+              // This is a reference
+              references.push({
+                property: key,
+                target: value.beacon,
+                targetClass: value.beacon.split("/").pop() || "Unknown",
+              });
+            }
+          });
 
-  // Get available reference properties for selected from object
-  const getAvailableProperties = (fromObjectId: string) => {
-    const fromObject = objects.find((obj) => obj.id === fromObjectId);
-    if (!fromObject) return [];
+          return {
+            id: obj.id,
+            class: obj.class || "Unknown",
+            properties: obj.properties || {},
+            references: references.length > 0 ? references : undefined,
+          };
+        })
+        .filter((obj) => obj.references && obj.references.length > 0);
 
-    const schema = schemas.find((s) => s.className === fromObject.className);
-    return schema?.referenceProperties || [];
+      setObjectsWithReferences(processedObjects);
+      setError(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch reference data";
+
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        setError(
+          "CORS Error: Cannot connect in development mode. References are part of object data.",
+        );
+
+        // Demo schema with reference properties
+        setSchemas([
+          {
+            class: "Article",
+            properties: [
+              { name: "title", dataType: ["text"] },
+              {
+                name: "author",
+                dataType: ["User"],
+                description: "Article author",
+              },
+              { name: "category", dataType: ["Category"] },
+            ],
+          },
+          {
+            class: "User",
+            properties: [
+              { name: "name", dataType: ["text"] },
+              { name: "email", dataType: ["text"] },
+            ],
+          },
+        ]);
+
+        // Demo objects with references
+        setObjectsWithReferences([
+          {
+            id: "demo-article-1",
+            class: "Article",
+            properties: {
+              title: "Understanding Vector Databases",
+            },
+            references: [
+              {
+                property: "author",
+                target: "weaviate://localhost/User/demo-user-1",
+                targetClass: "User",
+              },
+            ],
+          },
+        ]);
+
+        toast({
+          title: "Development Mode",
+          description:
+            "CORS prevents live connection. Showing demo references.",
+        });
+      } else {
+        setError(errorMessage);
+        setSchemas([]);
+        setObjectsWithReferences([]);
+        toast({
+          title: "References Error",
+          description: `Could not fetch reference data: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
+    }
   };
 
-  // Get available target objects for selected property
-  const getAvailableTargets = (fromObjectId: string, propertyName: string) => {
-    const fromObject = objects.find((obj) => obj.id === fromObjectId);
-    if (!fromObject) return [];
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchReferenceData();
+    setRefreshing(false);
 
-    const schema = schemas.find((s) => s.className === fromObject.className);
-    const property = schema?.referenceProperties.find(
-      (p) => p.name === propertyName,
-    );
-    if (!property) return [];
-
-    return objects.filter(
-      (obj) =>
-        obj.className === property.targetClass && obj.id !== fromObjectId,
-    );
+    toast({
+      title: "References Refreshed",
+      description: "Reference data has been updated from Weaviate.",
+    });
   };
 
-  // Handle adding a new reference
-  const handleAddReference = () => {
-    if (
-      !referenceForm.fromObjectId ||
-      !referenceForm.propertyName ||
-      !referenceForm.toObjectId
-    ) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Check if reference already exists
-    const existingRef = references.find(
-      (ref) =>
-        ref.fromObject.id === referenceForm.fromObjectId &&
-        ref.propertyName === referenceForm.propertyName &&
-        ref.toObject.id === referenceForm.toObjectId,
-    );
-
-    if (existingRef) {
-      toast({
-        title: "Reference Exists",
-        description: "This reference already exists",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const fromObject = objects.find(
-      (obj) => obj.id === referenceForm.fromObjectId,
-    )!;
-    const toObject = objects.find(
-      (obj) => obj.id === referenceForm.toObjectId,
-    )!;
-
-    const newReference: Reference = {
-      id: `ref-${Date.now()}`,
-      fromObject,
-      toObject,
-      propertyName: referenceForm.propertyName,
-      direction: "outgoing",
-      createdAt: new Date().toISOString(),
-      beacon: `weaviate://localhost/${toObject.className}/${toObject.id}`,
+  // Initial load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await fetchReferenceData();
+      setLoading(false);
     };
 
-    setReferences([...references, newReference]);
-    setReferenceForm({ fromObjectId: "", propertyName: "", toObjectId: "" });
-    setShowAddReference(false);
+    loadData();
+  }, []);
 
-    toast({
-      title: "Success",
-      description: "Reference created successfully",
-    });
-  };
-
-  // Handle deleting a reference
-  const handleDeleteReference = () => {
-    if (!referenceToDelete) return;
-
-    setReferences(references.filter((ref) => ref.id !== referenceToDelete));
-    setReferenceToDelete(null);
-    setShowDeleteConfirm(false);
-
-    toast({
-      title: "Success",
-      description: "Reference deleted successfully",
-    });
-  };
-
-  // Get icon for object class
-  const getClassIcon = (className: string) => {
-    switch (className) {
-      case "Article":
-        return <FileText className="h-4 w-4" />;
-      case "Person":
-        return <User className="h-4 w-4" />;
-      case "Company":
-        return <Building className="h-4 w-4" />;
-      default:
-        return <LinkIcon className="h-4 w-4" />;
-    }
-  };
-
-  // Get color for object class
-  const getClassColor = (className: string) => {
-    switch (className) {
-      case "Article":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "Person":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Company":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
-  // Get display text for object
-  const getObjectDisplayText = (obj: WeaviateObject) => {
+  // Filter objects by search term
+  const filteredObjects = objectsWithReferences.filter((obj) => {
+    const searchLower = searchTerm.toLowerCase();
     return (
-      obj.properties.name ||
-      obj.properties.title ||
-      `${obj.className} ${obj.id.substring(0, 8)}`
+      obj.id.toLowerCase().includes(searchLower) ||
+      obj.class.toLowerCase().includes(searchLower) ||
+      Object.values(obj.properties).some((value) =>
+        String(value).toLowerCase().includes(searchLower),
+      )
     );
+  });
+
+  // Get reference properties from schema
+  const getReferenceProperties = () => {
+    const refProps: ReferenceProperty[] = [];
+    schemas.forEach((cls) => {
+      cls.properties?.forEach((prop) => {
+        if (
+          Array.isArray(prop.dataType) &&
+          prop.dataType.some(
+            (type) =>
+              !["text", "number", "boolean", "date", "uuid"].includes(type),
+          )
+        ) {
+          refProps.push({
+            name: prop.name,
+            dataType: Array.isArray(prop.dataType)
+              ? prop.dataType
+              : [prop.dataType],
+            targetClass: Array.isArray(prop.dataType)
+              ? prop.dataType.find(
+                  (type) =>
+                    !["text", "number", "boolean", "date", "uuid"].includes(
+                      type,
+                    ),
+                )
+              : undefined,
+            description: prop.description,
+          });
+        }
+      });
+    });
+    return refProps;
   };
 
-  // Reset form
-  const resetForm = () => {
-    setReferenceForm({ fromObjectId: "", propertyName: "", toObjectId: "" });
-  };
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <div>
+                <h2 className="text-lg font-medium">Loading References</h2>
+                <p className="text-muted-foreground">
+                  Analyzing objects for reference relationships...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
@@ -435,526 +310,213 @@ export default function References() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              Reference Management
+            <h1 className="text-3xl font-bold tracking-tight">
+              Object References
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Manage object references and relationships in your Weaviate
-              instance
+            <p className="text-muted-foreground">
+              View reference relationships between objects in your Weaviate
+              database
             </p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline">
-              <RefreshCw className="h-4 w-4 mr-2" />
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
-            <Dialog open={showAddReference} onOpenChange={setShowAddReference}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Reference
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New Reference</DialogTitle>
-                  <DialogDescription>
-                    Create a relationship between two objects
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="fromObject">
-                      From Object <span className="text-destructive">*</span>
-                    </Label>
-                    <Select
-                      value={referenceForm.fromObjectId}
-                      onValueChange={(value) => {
-                        setReferenceForm({
-                          fromObjectId: value,
-                          propertyName: "",
-                          toObjectId: "",
-                        });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select source object" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {objects.map((obj) => (
-                          <SelectItem key={obj.id} value={obj.id}>
-                            <div className="flex items-center gap-2">
-                              {getClassIcon(obj.className)}
-                              <span className="font-medium">
-                                {getObjectDisplayText(obj)}
-                              </span>
-                              <Badge className={getClassColor(obj.className)}>
-                                {obj.className}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {referenceForm.fromObjectId && (
-                    <div className="space-y-2">
-                      <Label htmlFor="propertyName">
-                        Reference Property{" "}
-                        <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={referenceForm.propertyName}
-                        onValueChange={(value) =>
-                          setReferenceForm({
-                            ...referenceForm,
-                            propertyName: value,
-                            toObjectId: "",
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select reference property" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableProperties(
-                            referenceForm.fromObjectId,
-                          ).map((prop) => (
-                            <SelectItem key={prop.name} value={prop.name}>
-                              <div className="space-y-1">
-                                <div className="font-medium">{prop.name}</div>
-                                <div className="text-sm text-muted-foreground">
-                                  → {prop.targetClass}{" "}
-                                  {prop.description && `(${prop.description})`}
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {referenceForm.propertyName && (
-                    <div className="space-y-2">
-                      <Label htmlFor="toObject">
-                        To Object <span className="text-destructive">*</span>
-                      </Label>
-                      <Select
-                        value={referenceForm.toObjectId}
-                        onValueChange={(value) =>
-                          setReferenceForm({
-                            ...referenceForm,
-                            toObjectId: value,
-                          })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select target object" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {getAvailableTargets(
-                            referenceForm.fromObjectId,
-                            referenceForm.propertyName,
-                          ).map((obj) => (
-                            <SelectItem key={obj.id} value={obj.id}>
-                              <div className="flex items-center gap-2">
-                                {getClassIcon(obj.className)}
-                                <span className="font-medium">
-                                  {getObjectDisplayText(obj)}
-                                </span>
-                                <Badge className={getClassColor(obj.className)}>
-                                  {obj.className}
-                                </Badge>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddReference(false);
-                        resetForm();
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleAddReference}
-                      disabled={
-                        !referenceForm.fromObjectId ||
-                        !referenceForm.propertyName ||
-                        !referenceForm.toObjectId
-                      }
-                    >
-                      Create Reference
-                    </Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2">
-                <LinkIcon className="h-5 w-5 text-primary" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Total References
-                  </p>
-                  <p className="text-2xl font-bold">{references.length}</p>
-                </div>
+        {error && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <span className="text-yellow-700 font-medium">
+                  Development Mode
+                </span>
               </div>
+              <p className="text-yellow-600 mt-2 text-sm">{error}</p>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2">
-                <Network className="h-5 w-5 text-blue-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Connected Objects
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {
-                      new Set([
-                        ...references.map((r) => r.fromObject.id),
-                        ...references.map((r) => r.toObject.id),
-                      ]).size
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-green-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Article References
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {
-                      references.filter(
-                        (r) =>
-                          r.fromObject.className === "Article" ||
-                          r.toObject.className === "Article",
-                      ).length
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2">
-                <User className="h-5 w-5 text-purple-500" />
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    Person References
-                  </p>
-                  <p className="text-2xl font-bold">
-                    {
-                      references.filter(
-                        (r) =>
-                          r.fromObject.className === "Person" ||
-                          r.toObject.className === "Person",
-                      ).length
-                    }
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        )}
 
-        {/* Filters */}
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* Information Alert */}
+        <Alert className="border-blue-200 bg-blue-50">
+          <Info className="h-4 w-4 text-blue-600" />
+          <AlertTitle className="text-blue-800">
+            About Object References
+          </AlertTitle>
+          <AlertDescription className="text-blue-700">
+            References in Weaviate link objects together. They are defined in
+            the schema and stored as part of object properties. This page shows
+            existing reference relationships found in your data.
+          </AlertDescription>
+        </Alert>
+
+        {/* Reference Properties in Schema */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <Network className="h-5 w-5 mr-2" />
+              Reference Properties in Schema
+            </CardTitle>
+            <CardDescription>
+              Properties defined in your schema that can hold references to
+              other objects
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {getReferenceProperties().length === 0 ? (
+              <div className="text-center py-8">
+                <Network className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">
+                  No Reference Properties Found
+                </h3>
+                <p className="text-muted-foreground">
+                  No reference properties are defined in your current schema.
+                </p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Property Name</TableHead>
+                    <TableHead>Target Class</TableHead>
+                    <TableHead>Description</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {getReferenceProperties().map((prop, index) => (
+                    <TableRow key={index}>
+                      <TableCell className="font-medium">{prop.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">
+                          {prop.targetClass || "Multiple"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {prop.description || "No description"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Search */}
+        <div className="flex items-center justify-between">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search references..."
+              placeholder="Search objects..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9"
             />
           </div>
-
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              <SelectItem value="Article">Article</SelectItem>
-              <SelectItem value="Person">Person</SelectItem>
-              <SelectItem value="Company">Company</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={selectedObject} onValueChange={setSelectedObject}>
-            <SelectTrigger className="w-64">
-              <SelectValue placeholder="Filter by object" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Objects</SelectItem>
-              {objects.map((obj) => (
-                <SelectItem key={obj.id} value={obj.id}>
-                  {getObjectDisplayText(obj)} ({obj.className})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
+          <div className="text-sm text-muted-foreground">
+            {filteredObjects.length} objects with references
+          </div>
         </div>
 
-        {/* References Table */}
+        {/* Objects with References */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <LinkIcon className="h-5 w-5" />
-              Object References ({filteredReferences.length})
+            <CardTitle className="flex items-center">
+              <LinkIcon className="h-5 w-5 mr-2" />
+              Objects with References
             </CardTitle>
             <CardDescription>
-              All references and relationships between objects
+              Objects in your database that have reference relationships
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>From Object</TableHead>
-                  <TableHead>Property</TableHead>
-                  <TableHead>To Object</TableHead>
-                  <TableHead>Direction</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReferences.map((reference) => (
-                  <TableRow key={reference.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          className={getClassColor(
-                            reference.fromObject.className,
-                          )}
-                        >
-                          <span className="flex items-center gap-1">
-                            {getClassIcon(reference.fromObject.className)}
-                            {reference.fromObject.className}
-                          </span>
-                        </Badge>
-                        <div>
-                          <p className="font-medium">
-                            {getObjectDisplayText(reference.fromObject)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {reference.fromObject.id.substring(0, 8)}...
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-mono text-sm bg-muted px-2 py-1 rounded">
-                          {reference.propertyName}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <Badge
-                          className={getClassColor(
-                            reference.toObject.className,
-                          )}
-                        >
-                          <span className="flex items-center gap-1">
-                            {getClassIcon(reference.toObject.className)}
-                            {reference.toObject.className}
-                          </span>
-                        </Badge>
-                        <div>
-                          <p className="font-medium">
-                            {getObjectDisplayText(reference.toObject)}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {reference.toObject.id.substring(0, 8)}...
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {reference.direction === "outgoing"
-                          ? "Outgoing"
-                          : "Incoming"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(reference.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem>
-                            <Eye className="h-4 w-4 mr-2" />
-                            View From Object
-                          </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View To Object
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => {
-                              setReferenceToDelete(reference.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete Reference
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {filteredReferences.length === 0 && (
-              <div className="text-center py-12">
-                <LinkIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">
-                  No references found
+            {filteredObjects.length === 0 ? (
+              <div className="text-center py-8">
+                <LinkIcon className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">
+                  No References Found
                 </h3>
-                <p className="text-muted-foreground mb-6">
-                  {searchTerm ||
-                  selectedObject !== "all" ||
-                  selectedClass !== "all"
-                    ? "Try adjusting your search or filter criteria"
-                    : "Create your first reference to connect objects"}
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm
+                    ? "No objects with references match your search."
+                    : "No objects with reference relationships were found in your database."}
                 </p>
-                {!searchTerm &&
-                  selectedObject === "all" &&
-                  selectedClass === "all" && (
-                    <Button onClick={() => setShowAddReference(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Create First Reference
-                    </Button>
-                  )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredObjects.map((obj) => (
+                  <Card key={obj.id} className="border">
+                    <CardContent className="pt-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <FileText className="h-4 w-4 text-blue-500" />
+                            <span className="font-medium">
+                              {obj.id.substring(0, 8)}...
+                            </span>
+                            <Badge variant="outline">{obj.class}</Badge>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Properties:</h4>
+                          <div className="grid gap-2 md:grid-cols-2">
+                            {Object.entries(obj.properties)
+                              .slice(0, 4)
+                              .map(([key, value]) => (
+                                <div key={key} className="text-sm">
+                                  <span className="font-medium">{key}:</span>{" "}
+                                  <span className="text-muted-foreground">
+                                    {String(value).substring(0, 50)}
+                                    {String(value).length > 50 ? "..." : ""}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">References:</h4>
+                          <div className="space-y-1">
+                            {obj.references?.map((ref, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center space-x-2 p-2 bg-muted rounded"
+                              >
+                                <ArrowRight className="h-3 w-3 text-blue-500" />
+                                <span className="text-sm font-medium">
+                                  {ref.property}
+                                </span>
+                                <ArrowRight className="h-3 w-3 text-gray-400" />
+                                <Badge variant="secondary">
+                                  {ref.targetClass}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground font-mono">
+                                  {ref.target.split("/").pop()?.substring(0, 8)}
+                                  ...
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
             )}
           </CardContent>
         </Card>
-
-        {/* Reference Schema Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Network className="h-5 w-5" />
-              Reference Schema
-            </CardTitle>
-            <CardDescription>
-              Available reference properties for each class
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {schemas.map((schema) => (
-                <div key={schema.className} className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge className={getClassColor(schema.className)}>
-                      <span className="flex items-center gap-1">
-                        {getClassIcon(schema.className)}
-                        {schema.className}
-                      </span>
-                    </Badge>
-                  </div>
-                  <div className="space-y-2">
-                    {schema.referenceProperties.map((prop) => (
-                      <div key={prop.name} className="border rounded-lg p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">
-                            {prop.name}
-                          </span>
-                          <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                          <Badge variant="outline" className="text-xs">
-                            {prop.targetClass}
-                          </Badge>
-                        </div>
-                        {prop.description && (
-                          <p className="text-xs text-muted-foreground">
-                            {prop.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                    {schema.referenceProperties.length === 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        No reference properties defined
-                      </p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Delete Reference Confirmation */}
-        <AlertDialog
-          open={showDeleteConfirm}
-          onOpenChange={setShowDeleteConfirm}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Reference</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete this reference? This will break
-                the relationship between the objects. This action cannot be
-                undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setReferenceToDelete(null)}>
-                Cancel
-              </AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDeleteReference}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                Delete Reference
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </Layout>
   );
