@@ -92,16 +92,6 @@ interface LiveAlert {
   severity: number;
 }
 
-interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: "error" | "warn" | "info" | "debug";
-  component: string;
-  message: string;
-  node: string;
-  details?: any;
-}
-
 interface PerformanceData {
   queries_per_second: number;
   avg_response_time: number;
