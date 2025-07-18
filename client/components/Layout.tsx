@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import ConnectionSettings from "./ConnectionSettings";
+import ConnectionStatus from "./ConnectionStatus";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
