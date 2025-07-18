@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import ConnectionSettings from "./ConnectionSettings";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
