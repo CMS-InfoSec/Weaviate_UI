@@ -201,11 +201,24 @@ export default function Modules() {
 
       if (
         errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch")
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("404") ||
+        errorMessage.includes("API request failed: 404")
       ) {
-        setError(
-          "CORS Error: Cannot connect in development mode. Showing demo data.",
-        );
+        const isDevelopment =
+          errorMessage.includes("CORS") ||
+          errorMessage.includes("Failed to fetch");
+        const is404 = errorMessage.includes("404");
+
+        if (isDevelopment) {
+          setError(
+            "CORS Error: Cannot connect in development mode. Showing demo data.",
+          );
+        } else if (is404) {
+          setError("API endpoints not available. Showing demo data.");
+        } else {
+          setError("Connection error. Showing demo data.");
+        }
 
         // Fallback demo modules with realistic data
         setModules([
