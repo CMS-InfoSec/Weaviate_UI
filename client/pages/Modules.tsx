@@ -175,22 +175,18 @@ export default function Modules() {
       });
 
       setModules(extractedModules);
+      setError(null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch modules";
 
-      console.error("Full error details:", err);
-      console.error("Error message:", errorMessage);
-
-      // Handle any connection or API errors by showing demo data
       if (
         errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch") ||
-        errorMessage.includes("404") ||
-        errorMessage.includes("API request failed") ||
-        errorMessage.includes("Meta endpoint error") ||
-        true // Always fallback to demo data on any error
+        errorMessage.includes("Failed to fetch")
       ) {
+        setError(
+          "CORS Error: Cannot connect in development mode. Showing demo data.",
+        );
         const isDevelopment =
           errorMessage.includes("CORS") ||
           errorMessage.includes("Failed to fetch");
