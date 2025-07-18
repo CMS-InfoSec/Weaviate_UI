@@ -22,18 +22,7 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,17 +31,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import {
   Settings,
@@ -65,28 +45,45 @@ import {
   MessageSquare,
   Image,
   FileText,
-  Music,
-  Video,
-  Globe,
   Database,
   MoreHorizontal,
-  Play,
-  Square,
   RefreshCw,
   Loader2,
+  ExternalLink,
+  Play,
+  Square,
+  AlertTriangle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import API_CONFIG from "@/lib/api";
 
 interface Module {
   name: string;
-  type: "vectorizer" | "generator" | "reader" | "qna" | "reranker";
+  type: "vectorizer" | "generator" | "reader" | "qna" | "reranker" | "other";
   description: string;
   enabled: boolean;
   version?: string;
-  status: "active" | "inactive" | "error";
+  status: "active" | "inactive" | "error" | "unknown";
   config?: Record<string, any>;
-  dependencies?: string[];
+  documentationHref?: string;
+  displayName?: string;
+}
+
+interface WeaviateMetaResponse {
+  hostname: string;
+  version: string;
+  modules: Record<
+    string,
+    {
+      name?: string;
+      version?: string;
+      documentationHref?: string;
+    }
+  >;
+}
+
+interface WeaviateModulesResponse {
+  modules: Record<string, any>;
 }
 
 export default function Modules() {
@@ -97,56 +94,91 @@ export default function Modules() {
   const [modules, setModules] = useState<Module[]>([]);
   const [selectedModule, setSelectedModule] = useState<Module | null>(null);
   const [activeTab, setActiveTab] = useState("all");
+  const [weaviateVersion, setWeaviateVersion] = useState<string>("");
+  const [hostname, setHostname] = useState<string>("");
 
-  // Fetch modules from Weaviate meta endpoint
+  // Fetch modules from both /v1/meta and /v1/modules endpoints
   const fetchModules = async () => {
     try {
-      const meta = await API_CONFIG.get("/meta");
+      setError(null);
 
-      // Extract module information from meta response
-      const moduleData = meta.modules || {};
+      // Fetch from /v1/meta endpoint first
+      const metaResponse: WeaviateMetaResponse = await API_CONFIG.get("/meta");
+      setWeaviateVersion(metaResponse.version || "Unknown");
+      setHostname(metaResponse.hostname || "Unknown");
+
+      // Try to fetch from /v1/modules endpoint for additional info
+      let modulesResponse: WeaviateModulesResponse | null = null;
+      try {
+        modulesResponse = await API_CONFIG.get("/modules");
+      } catch (modulesError) {
+        console.warn(
+          "Could not fetch from /v1/modules endpoint:",
+          modulesError,
+        );
+      }
+
+      // Process modules from meta response
       const extractedModules: Module[] = [];
+      const metaModules = metaResponse.modules || {};
 
-      // Process each module from meta
-      Object.entries(moduleData).forEach(
-        ([moduleName, moduleInfo]: [string, any]) => {
-          const module: Module = {
+      Object.entries(metaModules).forEach(([moduleName, moduleInfo]) => {
+        const module: Module = {
+          name: moduleName,
+          type: getModuleType(moduleName),
+          description: getModuleDescription(moduleName),
+          enabled: true, // If it's in meta, it's enabled
+          version: moduleInfo.version,
+          status: "active",
+          config: moduleInfo,
+          documentationHref: moduleInfo.documentationHref,
+          displayName: moduleInfo.name || moduleName,
+        };
+        extractedModules.push(module);
+      });
+
+      // Add commonly known modules that might not be enabled
+      const commonModules = [
+        "text2vec-openai",
+        "text2vec-transformers",
+        "text2vec-cohere",
+        "text2vec-huggingface",
+        "text2vec-palm",
+        "generative-openai",
+        "generative-cohere",
+        "generative-palm",
+        "qna-openai",
+        "qna-transformers",
+        "reranker-cohere",
+        "img2vec-neural",
+        "multi2vec-clip",
+        "backup-filesystem",
+        "backup-s3",
+        "backup-gcs",
+      ];
+
+      // Add missing common modules as inactive
+      commonModules.forEach((moduleName) => {
+        if (!extractedModules.find((m) => m.name === moduleName)) {
+          extractedModules.push({
             name: moduleName,
             type: getModuleType(moduleName),
             description: getModuleDescription(moduleName),
-            enabled: true, // Assume enabled if in meta
-            version: moduleInfo.version || "Unknown",
-            status: "active",
-            config: moduleInfo,
-          };
-          extractedModules.push(module);
-        },
-      );
-
-      // If no modules found, show common ones as disabled
-      if (extractedModules.length === 0) {
-        const commonModules = [
-          "text2vec-openai",
-          "text2vec-transformers",
-          "text2vec-cohere",
-          "generative-openai",
-          "qna-openai",
-          "reranker-cohere",
-        ];
-
-        commonModules.forEach((name) => {
-          extractedModules.push({
-            name,
-            type: getModuleType(name),
-            description: getModuleDescription(name),
             enabled: false,
             status: "inactive",
           });
-        });
-      }
+        }
+      });
+
+      // Sort modules - enabled first, then by name
+      extractedModules.sort((a, b) => {
+        if (a.enabled !== b.enabled) {
+          return b.enabled ? 1 : -1;
+        }
+        return a.name.localeCompare(b.name);
+      });
 
       setModules(extractedModules);
-      setError(null);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "Failed to fetch modules";
@@ -159,41 +191,57 @@ export default function Modules() {
           "CORS Error: Cannot connect in development mode. Showing demo data.",
         );
 
-        // Fallback demo modules
+        // Fallback demo modules with realistic data
         setModules([
           {
             name: "text2vec-openai",
             type: "vectorizer",
-            description: "OpenAI text vectorization module (Demo)",
+            description: "OpenAI text vectorization using embeddings API",
             enabled: true,
             version: "1.0.0",
             status: "active",
             config: { model: "text-embedding-ada-002" },
-          },
-          {
-            name: "text2vec-transformers",
-            type: "vectorizer",
-            description: "Transformers-based text vectorization (Demo)",
-            enabled: false,
-            status: "inactive",
+            documentationHref:
+              "https://platform.openai.com/docs/guides/embeddings",
+            displayName: "OpenAI Vectorizer",
           },
           {
             name: "generative-openai",
             type: "generator",
-            description: "OpenAI text generation module (Demo)",
+            description: "OpenAI text generation using GPT models",
             enabled: true,
             version: "1.0.0",
             status: "active",
             config: { model: "gpt-3.5-turbo" },
+            documentationHref:
+              "https://platform.openai.com/docs/guides/generation",
+            displayName: "Generative Search - OpenAI",
+          },
+          {
+            name: "text2vec-transformers",
+            type: "vectorizer",
+            description: "Local transformers-based text vectorization",
+            enabled: false,
+            status: "inactive",
           },
           {
             name: "qna-openai",
             type: "qna",
-            description: "OpenAI Q&A module (Demo)",
+            description: "Question-answering using OpenAI models",
+            enabled: false,
+            status: "inactive",
+          },
+          {
+            name: "reranker-cohere",
+            type: "reranker",
+            description: "Cohere reranking service for improved search results",
             enabled: false,
             status: "inactive",
           },
         ]);
+
+        setWeaviateVersion("1.26.1 (Demo)");
+        setHostname("weaviate.cmsinfosec.com (Demo)");
 
         toast({
           title: "Development Mode",
@@ -213,13 +261,17 @@ export default function Modules() {
 
   // Helper functions
   const getModuleType = (moduleName: string): Module["type"] => {
-    if (moduleName.includes("text2vec") || moduleName.includes("img2vec"))
+    if (
+      moduleName.includes("text2vec") ||
+      moduleName.includes("img2vec") ||
+      moduleName.includes("multi2vec")
+    )
       return "vectorizer";
     if (moduleName.includes("generative")) return "generator";
     if (moduleName.includes("reader")) return "reader";
     if (moduleName.includes("qna")) return "qna";
     if (moduleName.includes("reranker")) return "reranker";
-    return "vectorizer";
+    return "other";
   };
 
   const getModuleDescription = (moduleName: string): string => {
@@ -228,12 +280,18 @@ export default function Modules() {
       "text2vec-transformers": "Local transformers-based text vectorization",
       "text2vec-cohere": "Cohere text vectorization service",
       "text2vec-huggingface": "Hugging Face transformers integration",
+      "text2vec-palm": "Google PaLM text vectorization service",
       "generative-openai": "OpenAI text generation using GPT models",
       "generative-cohere": "Cohere text generation service",
+      "generative-palm": "Google PaLM text generation service",
       "qna-openai": "Question-answering using OpenAI models",
       "qna-transformers": "Local transformers Q&A models",
-      "reranker-cohere": "Cohere reranking service",
+      "reranker-cohere": "Cohere reranking service for improved search results",
       "img2vec-neural": "Neural network image vectorization",
+      "multi2vec-clip": "CLIP-based multimodal vectorization",
+      "backup-filesystem": "Local filesystem backup storage",
+      "backup-s3": "Amazon S3 backup storage",
+      "backup-gcs": "Google Cloud Storage backup",
     };
     return descriptions[moduleName] || `${moduleName} module`;
   };
@@ -258,30 +316,43 @@ export default function Modules() {
   const getStatusColor = (status: Module["status"]) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
       case "inactive":
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
       case "error":
-        return "bg-red-100 text-red-800";
+        return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
+    }
+  };
+
+  const getStatusIcon = (status: Module["status"]) => {
+    switch (status) {
+      case "active":
+        return <Play className="h-3 w-3" />;
+      case "inactive":
+        return <Square className="h-3 w-3" />;
+      case "error":
+        return <AlertTriangle className="h-3 w-3" />;
+      default:
+        return <AlertCircle className="h-3 w-3" />;
     }
   };
 
   const getTypeColor = (type: Module["type"]) => {
     switch (type) {
       case "vectorizer":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
       case "generator":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-400";
       case "reader":
-        return "bg-green-100 text-green-800";
+        return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
       case "qna":
-        return "bg-orange-100 text-orange-800";
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400";
       case "reranker":
-        return "bg-pink-100 text-pink-800";
+        return "bg-pink-100 text-pink-800 dark:bg-pink-900/20 dark:text-pink-400";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
 
@@ -326,7 +397,7 @@ export default function Modules() {
               <div>
                 <h2 className="text-lg font-medium">Loading Modules</h2>
                 <p className="text-muted-foreground">
-                  Fetching module data from Weaviate instance...
+                  Fetching live module data from Weaviate instance...
                 </p>
               </div>
             </div>
@@ -343,11 +414,16 @@ export default function Modules() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Module Information
+              Modules Management
             </h1>
             <p className="text-muted-foreground">
-              View Weaviate modules and their current configurations
+              View and manage Weaviate modules and their configurations
             </p>
+            {hostname && (
+              <p className="text-sm text-muted-foreground mt-1">
+                Connected to: {hostname} • Version: {weaviateVersion}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -365,15 +441,17 @@ export default function Modules() {
         </div>
 
         {error && (
-          <Card className="border-yellow-200 bg-yellow-50">
+          <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950">
             <CardContent className="pt-4">
               <div className="flex items-center space-x-2">
                 <AlertCircle className="h-4 w-4 text-yellow-500" />
-                <span className="text-yellow-700 font-medium">
+                <span className="text-yellow-700 dark:text-yellow-400 font-medium">
                   Development Mode
                 </span>
               </div>
-              <p className="text-yellow-600 mt-2 text-sm">{error}</p>
+              <p className="text-yellow-600 dark:text-yellow-400 mt-2 text-sm">
+                {error}
+              </p>
             </CardContent>
           </Card>
         )}
@@ -445,10 +523,15 @@ export default function Modules() {
         >
           <TabsList>
             <TabsTrigger value="all">All Modules</TabsTrigger>
-            <TabsTrigger value="enabled">Enabled</TabsTrigger>
-            <TabsTrigger value="disabled">Disabled</TabsTrigger>
+            <TabsTrigger value="enabled">
+              Enabled ({modules.filter((m) => m.enabled).length})
+            </TabsTrigger>
+            <TabsTrigger value="disabled">
+              Disabled ({modules.filter((m) => !m.enabled).length})
+            </TabsTrigger>
             <TabsTrigger value="vectorizer">Vectorizers</TabsTrigger>
             <TabsTrigger value="generator">Generators</TabsTrigger>
+            <TabsTrigger value="other">Other</TabsTrigger>
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
@@ -459,7 +542,8 @@ export default function Modules() {
                   Modules ({filteredModules.length})
                 </CardTitle>
                 <CardDescription>
-                  Configure and manage Weaviate modules
+                  Module status is determined by live data from your Weaviate
+                  instance
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -490,7 +574,17 @@ export default function Modules() {
                         <TableRow key={module.name}>
                           <TableCell className="flex items-center space-x-2">
                             {getModuleIcon(module.type)}
-                            <span className="font-medium">{module.name}</span>
+                            <div>
+                              <div className="font-medium">
+                                {module.displayName || module.name}
+                              </div>
+                              {module.displayName &&
+                                module.displayName !== module.name && (
+                                  <div className="text-xs text-muted-foreground">
+                                    {module.name}
+                                  </div>
+                                )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Badge
@@ -503,13 +597,16 @@ export default function Modules() {
                           <TableCell className="max-w-xs truncate">
                             {module.description}
                           </TableCell>
-                          <TableCell>{module.version || "Unknown"}</TableCell>
+                          <TableCell>{module.version || "N/A"}</TableCell>
                           <TableCell>
                             <Badge
                               variant="outline"
                               className={getStatusColor(module.status)}
                             >
-                              {module.status}
+                              <span className="flex items-center gap-1">
+                                {getStatusIcon(module.status)}
+                                {module.status}
+                              </span>
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
@@ -527,6 +624,22 @@ export default function Modules() {
                                   <Info className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
+                                {module.documentationHref && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                      <a
+                                        href={module.documentationHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center"
+                                      >
+                                        <ExternalLink className="h-4 w-4 mr-2" />
+                                        Documentation
+                                      </a>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -535,6 +648,52 @@ export default function Modules() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Configuration Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Settings className="h-5 w-5 mr-2" />
+                  Module Configuration
+                </CardTitle>
+                <CardDescription>
+                  How to configure modules in your Weaviate deployment
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Environment Variables</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Modules are configured at deployment time using environment
+                    variables:
+                  </p>
+                  <div className="bg-muted p-3 rounded-lg font-mono text-sm">
+                    <div>ENABLE_MODULES=text2vec-openai,generative-openai</div>
+                    <div>DEFAULT_VECTORIZER_MODULE=text2vec-openai</div>
+                    <div>OPENAI_APIKEY=your-api-key</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Runtime Configuration</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Some module settings can be updated at runtime when enabled:
+                  </p>
+                  <div className="bg-muted p-3 rounded-lg font-mono text-sm">
+                    <div>RUNTIME_OVERRIDES_ENABLED=true</div>
+                    <div>RUNTIME_OVERRIDES_PATH=/config/overrides.json</div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-medium">Docker/Kubernetes Deployment</h4>
+                  <p className="text-sm text-muted-foreground">
+                    For containerized deployments, add environment variables to
+                    your deployment configuration.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -550,7 +709,18 @@ export default function Modules() {
               <DialogHeader>
                 <DialogTitle className="flex items-center space-x-2">
                   {getModuleIcon(selectedModule.type)}
-                  <span>{selectedModule.name}</span>
+                  <span>
+                    {selectedModule.displayName || selectedModule.name}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className={getStatusColor(selectedModule.status)}
+                  >
+                    <span className="flex items-center gap-1">
+                      {getStatusIcon(selectedModule.status)}
+                      {selectedModule.status}
+                    </span>
+                  </Badge>
                 </DialogTitle>
                 <DialogDescription>
                   {selectedModule.description}
@@ -558,6 +728,10 @@ export default function Modules() {
               </DialogHeader>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Module Name</Label>
+                    <p className="text-sm font-mono">{selectedModule.name}</p>
+                  </div>
                   <div>
                     <Label>Type</Label>
                     <Badge
@@ -568,32 +742,45 @@ export default function Modules() {
                     </Badge>
                   </div>
                   <div>
-                    <Label>Status</Label>
-                    <Badge
-                      variant="outline"
-                      className={getStatusColor(selectedModule.status)}
-                    >
-                      {selectedModule.status}
-                    </Badge>
-                  </div>
-                  <div>
                     <Label>Version</Label>
                     <p className="text-sm text-muted-foreground">
-                      {selectedModule.version || "Unknown"}
+                      {selectedModule.version || "Not specified"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label>Enabled</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedModule.enabled ? "Yes" : "No"}
                     </p>
                   </div>
                 </div>
 
-                {selectedModule.config && (
+                {selectedModule.documentationHref && (
                   <div>
-                    <Label>Configuration</Label>
-                    <div className="mt-2 p-4 bg-muted rounded-lg">
-                      <pre className="text-sm overflow-auto">
-                        {JSON.stringify(selectedModule.config, null, 2)}
-                      </pre>
-                    </div>
+                    <Label>Documentation</Label>
+                    <a
+                      href={selectedModule.documentationHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-primary hover:underline flex items-center gap-1 mt-1"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      View official documentation
+                    </a>
                   </div>
                 )}
+
+                {selectedModule.config &&
+                  Object.keys(selectedModule.config).length > 0 && (
+                    <div>
+                      <Label>Live Configuration</Label>
+                      <div className="mt-2 p-4 bg-muted rounded-lg">
+                        <pre className="text-sm overflow-auto">
+                          {JSON.stringify(selectedModule.config, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
               </div>
             </DialogContent>
           </Dialog>
