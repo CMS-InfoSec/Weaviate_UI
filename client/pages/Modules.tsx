@@ -372,6 +372,53 @@ export default function Modules() {
     }
   };
 
+  // Toggle module enabled/disabled state
+  const handleToggleModule = async (module: Module) => {
+    try {
+      // In a real implementation, this would make an API call to enable/disable the module
+      // For now, we'll show a message about how to configure modules
+      toast({
+        title: "Module Configuration",
+        description: `To ${module.enabled ? "disable" : "enable"} ${module.name}, update your Weaviate deployment configuration.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Configuration Error",
+        description:
+          "Unable to toggle module. Check your deployment configuration.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Configure module settings
+  const handleConfigureModule = (module: Module) => {
+    setConfiguringModule(module);
+    setModuleConfig(module.config || {});
+    setConfigDialogOpen(true);
+  };
+
+  // Save module configuration
+  const handleSaveConfig = async () => {
+    if (!configuringModule) return;
+
+    try {
+      // In a real implementation, this would update the module configuration via API
+      toast({
+        title: "Configuration Info",
+        description:
+          "Module configuration is managed through environment variables and deployment settings.",
+      });
+      setConfigDialogOpen(false);
+    } catch (error) {
+      toast({
+        title: "Configuration Error",
+        description: "Unable to save module configuration.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Refresh modules
   const handleRefresh = async () => {
     setRefreshing(true);
