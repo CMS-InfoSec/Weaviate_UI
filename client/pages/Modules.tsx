@@ -100,10 +100,19 @@ export default function Modules() {
   // Fetch modules from Weaviate endpoints
   const fetchModules = async () => {
     try {
-      // Temporarily show demo data to resolve API issues
-      console.info("Using demo data due to API connectivity issues");
-      setError("API connection error: Showing demo data.");
-      throw new Error("Failed to fetch");
+      // Fetch from /v1/meta endpoint
+      const meta = await API_CONFIG.get("/meta");
+
+      setWeaviateVersion(meta.version || "Unknown");
+      setHostname(meta.hostname || "Unknown");
+
+      // Try to fetch from /v1/modules endpoint for additional info (optional)
+      let modulesInfo = null;
+      try {
+        modulesInfo = await API_CONFIG.get("/modules");
+      } catch (e) {
+        console.warn("Could not fetch modules info:", e);
+      }
 
       // Process modules from meta response
       const extractedModules: Module[] = [];
