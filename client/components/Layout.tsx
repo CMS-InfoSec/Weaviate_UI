@@ -24,7 +24,6 @@ const navigation = [
   { name: "Objects", href: "/objects", icon: FileText },
   { name: "References", href: "/references", icon: LinkIcon },
   { name: "Search", href: "/search", icon: Search },
-  { name: "Modules", href: "/modules", icon: Puzzle },
   { name: "Backup & Restore", href: "/backup", icon: Archive },
   { name: "Monitoring", href: "/monitoring", icon: Activity },
   { name: "Settings", href: "/settings", icon: Settings },
