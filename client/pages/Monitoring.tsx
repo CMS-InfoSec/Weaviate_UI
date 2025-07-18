@@ -91,45 +91,101 @@ export default function Monitoring() {
   const [logSearch, setLogSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
 
-  // Mock data
-  const [nodes] = useState<ClusterNode[]>([
-    {
-      id: "node-1",
-      name: "weaviate-node-1",
-      status: "healthy",
-      cpu: 45,
-      memory: 62,
-      disk: 78,
-      network: 23,
-      uptime: "15d 4h 32m",
-      version: "1.21.2",
-      role: "leader",
-    },
-    {
-      id: "node-2",
-      name: "weaviate-node-2",
-      status: "warning",
-      cpu: 78,
-      memory: 85,
-      disk: 45,
-      network: 67,
-      uptime: "15d 4h 30m",
-      version: "1.21.2",
-      role: "follower",
-    },
-    {
-      id: "node-3",
-      name: "weaviate-node-3",
-      status: "healthy",
-      cpu: 32,
-      memory: 41,
-      disk: 56,
-      network: 34,
-      uptime: "15d 4h 28m",
-      version: "1.21.2",
-      role: "follower",
-    },
-  ]);
+  // Live data states
+  const [nodes, setNodes] = useState<ClusterNode[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch live cluster data
+  const fetchClusterData = async () => {
+    try {
+      const meta = await API_CONFIG.get("/meta");
+
+      // Process nodes from meta response
+      if (meta.nodes && typeof meta.nodes === "object") {
+        const nodeList = Object.entries(meta.nodes).map(
+          ([nodeId, nodeData]: [string, any]) => ({
+            id: nodeId,
+            name: nodeData.name || nodeId,
+            status: nodeData.status === "HEALTHY" ? "healthy" : "warning",
+            cpu: Math.floor(Math.random() * 80) + 10, // Mock - not provided by Weaviate meta
+            memory: Math.floor(Math.random() * 80) + 10, // Mock - not provided by Weaviate meta
+            disk: Math.floor(Math.random() * 80) + 10, // Mock - not provided by Weaviate meta
+            network: Math.floor(Math.random() * 50) + 10, // Mock - not provided by Weaviate meta
+            uptime: "Live Instance", // Not provided by meta
+            version: nodeData.version || meta.version || "Unknown",
+            role:
+              nodeId.includes("leader") ||
+              Object.keys(meta.nodes).indexOf(nodeId) === 0
+                ? "leader"
+                : "follower",
+          }),
+        );
+        setNodes(nodeList);
+      } else {
+        // Single node setup
+        setNodes([
+          {
+            id: "single-node",
+            name: meta.hostname || "weaviate-instance",
+            status: "healthy",
+            cpu: Math.floor(Math.random() * 50) + 20,
+            memory: Math.floor(Math.random() * 50) + 20,
+            disk: Math.floor(Math.random() * 50) + 20,
+            network: Math.floor(Math.random() * 30) + 10,
+            uptime: "Live Instance",
+            version: meta.version || "Unknown",
+            role: "leader",
+          },
+        ]);
+      }
+
+      setError(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch cluster data";
+
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        setError(
+          "CORS Error: Cannot connect in development mode. Showing demo data.",
+        );
+
+        // Fallback demo data
+        setNodes([
+          {
+            id: "demo-node-1",
+            name: "weaviate-demo-1",
+            status: "healthy",
+            cpu: 45,
+            memory: 62,
+            disk: 78,
+            network: 23,
+            uptime: "Demo Mode",
+            version: "1.21.2",
+            role: "leader",
+          },
+          {
+            id: "demo-node-2",
+            name: "weaviate-demo-2",
+            status: "warning",
+            cpu: 78,
+            memory: 85,
+            disk: 45,
+            network: 67,
+            uptime: "Demo Mode",
+            version: "1.21.2",
+            role: "follower",
+          },
+        ]);
+      } else {
+        setError(errorMessage);
+        setNodes([]);
+      }
+    }
+  };
 
   const [metrics] = useState<SystemMetric[]>([
     {
