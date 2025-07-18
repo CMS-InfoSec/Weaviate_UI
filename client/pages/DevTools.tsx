@@ -191,99 +191,72 @@ export default function DevTools() {
     },
   ];
 
-  const schemaClasses: SchemaClass[] = [
-    {
-      name: "Article",
-      description: "News articles and blog posts",
-      vectorizer: "text2vec-openai",
-      properties: [
+  // Live schema data
+  const [schemaClasses, setSchemaClasses] = useState<SchemaClass[]>([]);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+
+  // Fetch schema data
+  const fetchSchemaData = async () => {
+    setSchemaLoading(true);
+    try {
+      const schema = await API_CONFIG.get("/schema");
+      const classes = schema.classes || [];
+
+      setSchemaClasses(
+        classes.map((cls: any) => ({
+          name: cls.class,
+          description: cls.description || "No description",
+          vectorizer: cls.vectorizer || "none",
+          properties: cls.properties.map((prop: any) => ({
+            name: prop.name,
+            dataType: Array.isArray(prop.dataType)
+              ? prop.dataType[0]
+              : prop.dataType,
+            description: prop.description || "",
+          })),
+        })),
+      );
+    } catch (error) {
+      // Fallback demo data for CORS errors
+      setSchemaClasses([
         {
-          name: "title",
-          dataType: "text",
-          description: "Article title",
+          name: "Article",
+          description: "News articles and blog posts (Demo)",
+          vectorizer: "text2vec-openai",
+          properties: [
+            { name: "title", dataType: "text", description: "Article title" },
+            {
+              name: "content",
+              dataType: "text",
+              description: "Article content",
+            },
+            { name: "author", dataType: "text", description: "Article author" },
+          ],
         },
         {
-          name: "content",
-          dataType: "text",
-          description: "Article content",
+          name: "Product",
+          description: "E-commerce products (Demo)",
+          vectorizer: "text2vec-transformers",
+          properties: [
+            { name: "name", dataType: "text", description: "Product name" },
+            {
+              name: "description",
+              dataType: "text",
+              description: "Product description",
+            },
+            { name: "price", dataType: "number", description: "Product price" },
+          ],
         },
-        {
-          name: "author",
-          dataType: "text",
-          description: "Article author",
-        },
-        {
-          name: "publishedAt",
-          dataType: "date",
-          description: "Publication date",
-        },
-        {
-          name: "category",
-          dataType: "text",
-          description: "Article category",
-        },
-      ],
-    },
-    {
-      name: "Product",
-      description: "E-commerce products",
-      vectorizer: "text2vec-transformers",
-      properties: [
-        {
-          name: "name",
-          dataType: "text",
-          description: "Product name",
-        },
-        {
-          name: "description",
-          dataType: "text",
-          description: "Product description",
-        },
-        {
-          name: "price",
-          dataType: "number",
-          description: "Product price",
-        },
-        {
-          name: "sku",
-          dataType: "text",
-          description: "Stock keeping unit",
-        },
-        {
-          name: "inStock",
-          dataType: "boolean",
-          description: "Availability status",
-        },
-      ],
-    },
-    {
-      name: "User",
-      description: "User profiles and accounts",
-      vectorizer: "text2vec-openai",
-      properties: [
-        {
-          name: "username",
-          dataType: "text",
-          description: "User's username",
-        },
-        {
-          name: "email",
-          dataType: "text",
-          description: "User's email address",
-        },
-        {
-          name: "profile",
-          dataType: "text",
-          description: "User profile description",
-        },
-        {
-          name: "joinedAt",
-          dataType: "date",
-          description: "Account creation date",
-        },
-      ],
-    },
-  ];
+      ]);
+    } finally {
+      setSchemaLoading(false);
+    }
+  };
+
+  // Fetch schema on component mount
+  useEffect(() => {
+    fetchSchemaData();
+  }, []);
 
   const handleApiRequest = async () => {
     setLoading(true);
