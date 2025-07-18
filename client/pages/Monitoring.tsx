@@ -706,7 +706,6 @@ export default function Monitoring() {
             <TabsTrigger value="nodes">Node Details</TabsTrigger>
             <TabsTrigger value="metrics">Performance Metrics</TabsTrigger>
             <TabsTrigger value="alerts">Alerts & Events</TabsTrigger>
-            <TabsTrigger value="logs">System Logs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
