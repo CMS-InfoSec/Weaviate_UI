@@ -353,68 +353,6 @@ export default function Monitoring() {
     setAlerts(systemAlerts);
   };
 
-  // Generate system logs
-  const generateLogs = () => {
-    const systemLogs: LogEntry[] = [];
-    const now = new Date();
-    const components = [
-      "query-engine",
-      "indexer",
-      "cluster-manager",
-      "backup-service",
-      "auth-service",
-    ];
-    const logLevels: LogEntry["level"][] = ["error", "warn", "info", "debug"];
-
-    for (let i = 0; i < 50; i++) {
-      const timestamp = new Date(now.getTime() - Math.random() * 86400000); // Last 24 hours
-      const level = logLevels[Math.floor(Math.random() * logLevels.length)];
-      const component =
-        components[Math.floor(Math.random() * components.length)];
-      const node =
-        nodes[Math.floor(Math.random() * nodes.length)]?.name || "unknown";
-
-      let message = "";
-      switch (level) {
-        case "error":
-          message = `${component}: ${["Connection timeout", "Index rebuild failed", "Authentication failed", "Memory allocation error"][Math.floor(Math.random() * 4)]}`;
-          break;
-        case "warn":
-          message = `${component}: ${["High memory usage detected", "Slow query detected", "Connection pool exhausted", "Disk space low"][Math.floor(Math.random() * 4)]}`;
-          break;
-        case "info":
-          message = `${component}: ${["Operation completed successfully", "Service started", "Configuration updated", "Health check passed"][Math.floor(Math.random() * 4)]}`;
-          break;
-        case "debug":
-          message = `${component}: ${["Processing request", "Cache hit", "Vector index updated", "Heartbeat sent"][Math.floor(Math.random() * 4)]}`;
-          break;
-      }
-
-      systemLogs.push({
-        id: `log-${i}`,
-        timestamp: timestamp.toISOString(),
-        level,
-        component,
-        message,
-        node,
-        details:
-          level === "error"
-            ? {
-                stack_trace: "Error trace details...",
-                error_code: Math.floor(Math.random() * 1000),
-              }
-            : undefined,
-      });
-    }
-
-    // Sort by timestamp (most recent first)
-    systemLogs.sort(
-      (a, b) =>
-        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-    );
-    setLogs(systemLogs);
-  };
-
   // Helper functions
   const calculateUptime = (upSince?: string) => {
     if (!upSince) return "Unknown";
