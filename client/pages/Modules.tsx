@@ -865,6 +865,127 @@ export default function Modules() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Module Configuration Dialog */}
+        <Dialog open={configDialogOpen} onOpenChange={setConfigDialogOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center space-x-2">
+                <Settings className="h-5 w-5" />
+                <span>Configure {configuringModule?.name}</span>
+              </DialogTitle>
+              <DialogDescription>
+                Module configuration is managed through environment variables
+                and deployment settings.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div>
+                <Label className="text-base font-medium">
+                  Environment Variables
+                </Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  To configure this module, add these environment variables to
+                  your Weaviate deployment:
+                </p>
+                <div className="bg-muted p-4 rounded-lg font-mono text-sm space-y-2">
+                  <div># Enable the module</div>
+                  <div>ENABLE_MODULES={configuringModule?.name}</div>
+                  {configuringModule?.name?.includes("openai") && (
+                    <>
+                      <div># OpenAI API Key</div>
+                      <div>OPENAI_APIKEY=your-api-key-here</div>
+                    </>
+                  )}
+                  {configuringModule?.name?.includes("cohere") && (
+                    <>
+                      <div># Cohere API Key</div>
+                      <div>COHERE_APIKEY=your-api-key-here</div>
+                    </>
+                  )}
+                  {configuringModule?.name?.includes("huggingface") && (
+                    <>
+                      <div># Hugging Face API Key</div>
+                      <div>HUGGINGFACE_APIKEY=your-api-key-here</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">
+                  Current Configuration
+                </Label>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Live configuration from your Weaviate instance:
+                </p>
+                {configuringModule?.config &&
+                Object.keys(configuringModule.config).length > 0 ? (
+                  <div className="bg-muted p-4 rounded-lg">
+                    <pre className="text-sm overflow-auto">
+                      {JSON.stringify(configuringModule.config, null, 2)}
+                    </pre>
+                  </div>
+                ) : (
+                  <div className="bg-muted p-4 rounded-lg text-sm text-muted-foreground">
+                    No configuration data available
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <Label className="text-base font-medium">
+                  Deployment Methods
+                </Label>
+                <div className="space-y-3 mt-3">
+                  <div>
+                    <h4 className="font-medium text-sm">Docker</h4>
+                    <div className="bg-muted p-3 rounded-lg font-mono text-sm">
+                      docker run -e ENABLE_MODULES={configuringModule?.name}{" "}
+                      weaviate/weaviate
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-sm">Docker Compose</h4>
+                    <div className="bg-muted p-3 rounded-lg font-mono text-sm">
+                      <div>environment:</div>
+                      <div> ENABLE_MODULES: {configuringModule?.name}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-sm">Kubernetes</h4>
+                    <div className="bg-muted p-3 rounded-lg font-mono text-sm">
+                      <div>env:</div>
+                      <div>- name: ENABLE_MODULES</div>
+                      <div> value: {configuringModule?.name}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setConfigDialogOpen(false)}
+                >
+                  Close
+                </Button>
+                {configuringModule?.documentationHref && (
+                  <Button asChild>
+                    <a
+                      href={configuringModule.documentationHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      View Documentation
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
