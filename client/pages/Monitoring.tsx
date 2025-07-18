@@ -449,7 +449,6 @@ export default function Monitoring() {
       await fetchClusterData();
       generateMetrics();
       generateAlerts();
-      generateLogs();
       setLoading(false);
     };
 
