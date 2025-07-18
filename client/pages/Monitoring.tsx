@@ -107,8 +107,6 @@ export default function Monitoring() {
   const { toast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
   const [alertFilter, setAlertFilter] = useState("all");
-  const [logFilter, setLogFilter] = useState("all");
-  const [logSearch, setLogSearch] = useState("");
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [timeRange, setTimeRange] = useState("1h");
 
