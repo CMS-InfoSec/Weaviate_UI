@@ -147,7 +147,10 @@ export default function Layout({ children }: LayoutProps) {
             </Button>
             <h1 className="text-lg font-semibold">Weaviate Admin</h1>
           </div>
-          <ConnectionSettings />
+          <div className="flex items-center gap-2">
+            <ConnectionStatus />
+            <ConnectionSettings />
+          </div>
         </div>
 
         {/* Page content */}
