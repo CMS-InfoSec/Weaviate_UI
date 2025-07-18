@@ -285,36 +285,6 @@ export default function Modules() {
     }
   };
 
-  // Toggle module status (demo functionality)
-  const handleToggleModule = async (moduleName: string) => {
-    try {
-      // In a real scenario, this would call a Weaviate API to enable/disable modules
-      // For now, just update local state
-      setModules(
-        modules.map((module) =>
-          module.name === moduleName
-            ? {
-                ...module,
-                enabled: !module.enabled,
-                status: !module.enabled ? "active" : "inactive",
-              }
-            : module,
-        ),
-      );
-
-      toast({
-        title: `Module ${modules.find((m) => m.name === moduleName)?.enabled ? "Disabled" : "Enabled"}`,
-        description: `${moduleName} has been ${modules.find((m) => m.name === moduleName)?.enabled ? "disabled" : "enabled"}.`,
-      });
-    } catch (err) {
-      toast({
-        title: "Module Toggle Failed",
-        description: "Could not change module status.",
-        variant: "destructive",
-      });
-    }
-  };
-
   // Refresh modules
   const handleRefresh = async () => {
     setRefreshing(true);
