@@ -462,7 +462,6 @@ export default function Monitoring() {
         fetchClusterData();
         generateMetrics();
         generateAlerts();
-        generateLogs();
       }, 30000);
     }
     return () => {
