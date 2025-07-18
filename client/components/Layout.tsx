@@ -96,10 +96,13 @@ export default function Layout({ children }: LayoutProps) {
       {/* Desktop sidebar */}
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-1 flex-col bg-sidebar border-r border-sidebar-border">
-          <div className="flex h-16 items-center px-6">
+          <div className="flex h-16 items-center justify-between px-6">
             <h1 className="text-xl font-bold text-sidebar-foreground">
               Weaviate Admin
             </h1>
+          </div>
+          <div className="px-6 pb-4">
+            <ConnectionSettings />
           </div>
           <nav className="flex-1 px-4 py-4">
             <ul className="space-y-1">
