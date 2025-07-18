@@ -113,7 +113,12 @@ export default function Modules() {
       } catch (metaError) {
         const metaUrl = API_CONFIG.buildUrl("/meta");
         console.error(`Failed to fetch from ${metaUrl}:`, metaError);
-        throw metaError; // Re-throw to trigger fallback handling
+        // Don't re-throw, handle gracefully and trigger fallback
+        const errorMessage =
+          metaError instanceof Error
+            ? metaError.message
+            : "Failed to fetch meta";
+        throw new Error(`Meta endpoint error: ${errorMessage}`);
       }
 
       // Try to fetch from /v1/modules endpoint for additional info (optional)
