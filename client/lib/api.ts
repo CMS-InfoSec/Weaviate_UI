@@ -45,6 +45,8 @@ export const API_CONFIG = {
       const response = await fetch(url, {
         ...options,
         headers,
+        // Add mode for CORS handling
+        mode: "cors",
       });
 
       if (!response.ok) {
@@ -62,6 +64,14 @@ export const API_CONFIG = {
       }
     } catch (error) {
       console.error("API request error:", error);
+
+      // Check if it's a CORS or network error
+      if (error instanceof TypeError && error.message === "Failed to fetch") {
+        throw new Error(
+          "Cannot connect to Weaviate instance. This might be due to CORS restrictions or network connectivity issues.",
+        );
+      }
+
       throw error;
     }
   },
