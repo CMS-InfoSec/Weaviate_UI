@@ -100,24 +100,18 @@ export default function Modules() {
   // Fetch modules from Weaviate endpoints
   const fetchModules = async () => {
     try {
-      setError(null);
-
       // Fetch from /v1/meta endpoint
-      const metaUrl = API_CONFIG.buildUrl("/meta");
-      console.info("Fetching meta from:", metaUrl);
-      const metaResponse: WeaviateMetaResponse = await API_CONFIG.get("/meta");
+      const meta = await API_CONFIG.get("/meta");
 
-      setWeaviateVersion(metaResponse.version || "Unknown");
-      setHostname(metaResponse.hostname || "Unknown");
+      setWeaviateVersion(meta.version || "Unknown");
+      setHostname(meta.hostname || "Unknown");
 
       // Try to fetch from /v1/modules endpoint for additional info (optional)
-      // This endpoint may not exist on all Weaviate versions, so we ignore errors
-      let modulesResponse: WeaviateModulesResponse | null = null;
+      let modulesInfo = null;
       try {
-        modulesResponse = await API_CONFIG.get("/modules");
-      } catch {
-        // Silently ignore - this endpoint is not available on all Weaviate versions
-        console.info("/v1/modules endpoint not available");
+        modulesInfo = await API_CONFIG.get("/modules");
+      } catch (e) {
+        console.warn("Could not fetch modules info:", e);
       }
 
       // Process modules from meta response
