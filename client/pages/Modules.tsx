@@ -687,6 +687,23 @@ export default function Modules() {
                                   <Info className="h-4 w-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleToggleModule(module)}
+                                >
+                                  {module.enabled ? (
+                                    <Square className="h-4 w-4 mr-2" />
+                                  ) : (
+                                    <Play className="h-4 w-4 mr-2" />
+                                  )}
+                                  {module.enabled ? "Disable" : "Enable"}
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleConfigureModule(module)}
+                                >
+                                  <Settings className="h-4 w-4 mr-2" />
+                                  Configure
+                                </DropdownMenuItem>
                                 {module.documentationHref && (
                                   <>
                                     <DropdownMenuSeparator />
