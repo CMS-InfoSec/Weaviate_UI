@@ -325,11 +325,22 @@ export default function Monitoring() {
     },
   ]);
 
+  // Initial data load and auto-refresh
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await fetchClusterData();
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (autoRefresh) {
       interval = setInterval(() => {
-        // Simulate real-time updates
+        fetchClusterData();
       }, 30000);
     }
     return () => {
