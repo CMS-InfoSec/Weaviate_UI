@@ -343,10 +343,10 @@ export default function Modules() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
-              Module Configuration
+              Module Information
             </h1>
             <p className="text-muted-foreground">
-              Manage Weaviate modules and their configurations
+              View Weaviate modules and their current configurations
             </p>
           </div>
           <div className="flex items-center gap-2">
