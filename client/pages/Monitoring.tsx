@@ -466,21 +466,6 @@ export default function Monitoring() {
     }
   };
 
-  const getLogLevelColor = (level: string) => {
-    switch (level) {
-      case "error":
-        return "text-red-600 bg-red-50";
-      case "warn":
-        return "text-yellow-600 bg-yellow-50";
-      case "info":
-        return "text-blue-600 bg-blue-50";
-      case "debug":
-        return "text-gray-600 bg-gray-50";
-      default:
-        return "text-gray-600 bg-gray-50";
-    }
-  };
-
   const filteredAlerts = alerts.filter((alert) => {
     if (alertFilter === "all") return true;
     if (alertFilter === "unresolved") return !alert.resolved;
