@@ -433,39 +433,6 @@ export default function Monitoring() {
     });
   };
 
-  const handleExportLogs = () => {
-    const filteredLogs = logs.filter((log) => {
-      const matchesFilter = logFilter === "all" || log.level === logFilter;
-      const matchesSearch =
-        !logSearch ||
-        log.message.toLowerCase().includes(logSearch.toLowerCase()) ||
-        log.component.toLowerCase().includes(logSearch.toLowerCase());
-      return matchesFilter && matchesSearch;
-    });
-
-    const logData = {
-      exported_at: new Date().toISOString(),
-      total_logs: filteredLogs.length,
-      filters: { level: logFilter, search: logSearch },
-      logs: filteredLogs,
-    };
-
-    const blob = new Blob([JSON.stringify(logData, null, 2)], {
-      type: "application/json",
-    });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `weaviate-logs-${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-
-    toast({
-      title: "Logs Exported",
-      description: `${filteredLogs.length} log entries exported successfully.`,
-    });
-  };
-
   // Utility functions for styling
   const getStatusIcon = (status: string) => {
     switch (status) {
