@@ -308,12 +308,24 @@ export default function ConnectionSettings({
     }
   };
 
+  const currentProfile = profiles.find((p) => p.isDefault);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Database className="h-4 w-4 mr-2" />
-          Connection
+        <Button variant="outline" className="w-full justify-start text-left">
+          <div className="flex items-center gap-2 w-full">
+            {getStatusIcon(currentProfile?.status)}
+            <div className="flex-1 min-w-0">
+              <div className="font-medium text-sm truncate">
+                {currentProfile?.name || "No Connection"}
+              </div>
+              <div className="text-xs text-muted-foreground truncate">
+                {currentProfile?.endpoint || "Click to configure"}
+              </div>
+            </div>
+            <Settings className="h-4 w-4 flex-shrink-0" />
+          </div>
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
