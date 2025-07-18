@@ -383,36 +383,24 @@ export default function DevTools() {
     setLoading(true);
     setGraphqlResponse("");
 
-    // Simulate GraphQL request
-    setTimeout(() => {
-      const mockResponse = {
-        data: {
-          Get: {
-            Article: [
-              {
-                title: "Understanding Vector Databases",
-                content:
-                  "Vector databases are revolutionizing how we store and search data...",
-                _additional: {
-                  id: "36ddd591-2dee-4e7e-a3cc-eb86d30a4303",
-                  vector: [0.1, 0.2, 0.3, 0.4, 0.5],
-                },
-              },
-              {
-                title: "Introduction to Weaviate",
-                content: "Weaviate is an open-source vector database...",
-                _additional: {
-                  id: "47eee602-3eff-5f8f-b4dd-fc97e41b5404",
-                  vector: [0.2, 0.3, 0.4, 0.5, 0.6],
-                },
-              },
-            ],
-          },
-        },
-      };
+    try {
+      // Parse variables if provided
+      let variables = {};
+      if (graphqlVariables.trim()) {
+        try {
+          variables = JSON.parse(graphqlVariables);
+        } catch (e) {
+          throw new Error("Invalid JSON in variables");
+        }
+      }
 
-      setGraphqlResponse(JSON.stringify(mockResponse, null, 2));
-      setLoading(false);
+      // Make actual GraphQL request
+      const response = await API_CONFIG.post("/graphql", {
+        query: graphqlQuery,
+        variables: variables,
+      });
+
+      setGraphqlResponse(JSON.stringify(response, null, 2));
 
       // Add to history
       const historyEntry: QueryHistory = {
@@ -428,7 +416,62 @@ export default function DevTools() {
         title: "GraphQL Query Successful",
         description: "Query executed successfully",
       });
-    }, 1000);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "GraphQL query failed";
+
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        // Demo response for CORS issues
+        const mockResponse = {
+          error: "CORS Error in Development",
+          message: "GraphQL query would execute in production",
+          demo_data: {
+            query: graphqlQuery.substring(0, 100) + "...",
+            variables: graphqlVariables || "{}",
+            note: "Real GraphQL response would appear here",
+          },
+        };
+
+        setGraphqlResponse(JSON.stringify(mockResponse, null, 2));
+
+        toast({
+          title: "Development Mode",
+          description:
+            "CORS prevents live GraphQL queries. Showing demo response.",
+        });
+      } else {
+        setGraphqlResponse(
+          JSON.stringify(
+            {
+              errors: [{ message: errorMessage }],
+            },
+            null,
+            2,
+          ),
+        );
+
+        toast({
+          title: "GraphQL Query Failed",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      }
+
+      // Add error to history
+      const historyEntry: QueryHistory = {
+        id: Date.now().toString(),
+        type: "graphql",
+        query: graphqlQuery,
+        timestamp: new Date().toISOString(),
+        status: "error",
+      };
+      setQueryHistory([historyEntry, ...queryHistory]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const copyToClipboard = (text: string) => {
