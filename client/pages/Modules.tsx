@@ -96,6 +96,11 @@ export default function Modules() {
   const [activeTab, setActiveTab] = useState("all");
   const [weaviateVersion, setWeaviateVersion] = useState<string>("");
   const [hostname, setHostname] = useState<string>("");
+  const [configDialogOpen, setConfigDialogOpen] = useState(false);
+  const [configuringModule, setConfiguringModule] = useState<Module | null>(
+    null,
+  );
+  const [moduleConfig, setModuleConfig] = useState<Record<string, any>>({});
 
   // Fetch modules from Weaviate endpoints
   const fetchModules = async () => {
