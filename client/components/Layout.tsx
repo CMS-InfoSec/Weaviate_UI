@@ -130,16 +130,19 @@ export default function Layout({ children }: LayoutProps) {
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <div className="lg:hidden flex h-16 items-center px-4 border-b border-border bg-background">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSidebarOpen(true)}
-            className="mr-4"
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold">Weaviate Admin</h1>
+        <div className="lg:hidden flex h-16 items-center justify-between px-4 border-b border-border bg-background">
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSidebarOpen(true)}
+              className="mr-4"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <h1 className="text-lg font-semibold">Weaviate Admin</h1>
+          </div>
+          <ConnectionSettings />
         </div>
 
         {/* Page content */}
