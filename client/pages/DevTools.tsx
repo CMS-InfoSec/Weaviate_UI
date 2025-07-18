@@ -1,13 +1,1014 @@
+import { useState, useRef } from "react";
+import {
+  Code,
+  Play,
+  Copy,
+  Download,
+  Upload,
+  RefreshCw,
+  Terminal,
+  FileText,
+  Database,
+  Search,
+  Settings,
+  Bug,
+  Zap,
+  Eye,
+  BookOpen,
+  Send,
+  History,
+  Save,
+  Trash2,
+  ChevronDown,
+  ChevronRight,
+  ExternalLink,
+} from "lucide-react";
 import Layout from "@/components/Layout";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { useToast } from "@/hooks/use-toast";
+
+interface ApiEndpoint {
+  method: string;
+  path: string;
+  description: string;
+  parameters?: { name: string; type: string; required: boolean }[];
+}
+
+interface QueryHistory {
+  id: string;
+  type: "rest" | "graphql";
+  method?: string;
+  endpoint?: string;
+  query: string;
+  timestamp: string;
+  status?: "success" | "error";
+}
+
+interface SchemaClass {
+  name: string;
+  description: string;
+  properties: Array<{
+    name: string;
+    dataType: string;
+    description: string;
+  }>;
+  vectorizer: string;
+}
 
 export default function DevTools() {
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("api-explorer");
+
+  // API Explorer State
+  const [selectedMethod, setSelectedMethod] = useState("GET");
+  const [apiEndpoint, setApiEndpoint] = useState("/v1/objects");
+  const [requestBody, setRequestBody] = useState("");
+  const [responseData, setResponseData] = useState("");
+  const [responseStatus, setResponseStatus] = useState<number | null>(null);
+
+  // GraphQL State
+  const [graphqlQuery, setGraphqlQuery] = useState(`{
+  Get {
+    Article {
+      title
+      content
+      _additional {
+        id
+        vector
+      }
+    }
+  }
+}`);
+  const [graphqlVariables, setGraphqlVariables] = useState("{}");
+  const [graphqlResponse, setGraphqlResponse] = useState("");
+
+  // Schema Inspector State
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(
+    new Set(),
+  );
+
+  // Query History State
+  const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([
+    {
+      id: "1",
+      type: "rest",
+      method: "GET",
+      endpoint: "/v1/objects",
+      query: "GET /v1/objects",
+      timestamp: "2024-01-15T14:30:00Z",
+      status: "success",
+    },
+    {
+      id: "2",
+      type: "graphql",
+      query: "{ Get { Article { title } } }",
+      timestamp: "2024-01-15T14:25:00Z",
+      status: "success",
+    },
+    {
+      id: "3",
+      type: "rest",
+      method: "POST",
+      endpoint: "/v1/objects",
+      query: "POST /v1/objects - Create Article",
+      timestamp: "2024-01-15T14:20:00Z",
+      status: "error",
+    },
+  ]);
+
+  // Mock Data
+  const apiEndpoints: ApiEndpoint[] = [
+    {
+      method: "GET",
+      path: "/v1/objects",
+      description: "Retrieve all objects",
+      parameters: [
+        { name: "limit", type: "integer", required: false },
+        { name: "offset", type: "integer", required: false },
+        { name: "class", type: "string", required: false },
+      ],
+    },
+    {
+      method: "POST",
+      path: "/v1/objects",
+      description: "Create a new object",
+    },
+    {
+      method: "GET",
+      path: "/v1/objects/{id}",
+      description: "Retrieve object by ID",
+    },
+    {
+      method: "PUT",
+      path: "/v1/objects/{id}",
+      description: "Update an object",
+    },
+    {
+      method: "DELETE",
+      path: "/v1/objects/{id}",
+      description: "Delete an object",
+    },
+    {
+      method: "GET",
+      path: "/v1/schema",
+      description: "Retrieve the current schema",
+    },
+    {
+      method: "POST",
+      path: "/v1/schema",
+      description: "Create a new class",
+    },
+    {
+      method: "GET",
+      path: "/v1/nodes",
+      description: "Get cluster nodes information",
+    },
+  ];
+
+  const schemaClasses: SchemaClass[] = [
+    {
+      name: "Article",
+      description: "News articles and blog posts",
+      vectorizer: "text2vec-openai",
+      properties: [
+        {
+          name: "title",
+          dataType: "text",
+          description: "Article title",
+        },
+        {
+          name: "content",
+          dataType: "text",
+          description: "Article content",
+        },
+        {
+          name: "author",
+          dataType: "text",
+          description: "Article author",
+        },
+        {
+          name: "publishedAt",
+          dataType: "date",
+          description: "Publication date",
+        },
+        {
+          name: "category",
+          dataType: "text",
+          description: "Article category",
+        },
+      ],
+    },
+    {
+      name: "Product",
+      description: "E-commerce products",
+      vectorizer: "text2vec-transformers",
+      properties: [
+        {
+          name: "name",
+          dataType: "text",
+          description: "Product name",
+        },
+        {
+          name: "description",
+          dataType: "text",
+          description: "Product description",
+        },
+        {
+          name: "price",
+          dataType: "number",
+          description: "Product price",
+        },
+        {
+          name: "sku",
+          dataType: "text",
+          description: "Stock keeping unit",
+        },
+        {
+          name: "inStock",
+          dataType: "boolean",
+          description: "Availability status",
+        },
+      ],
+    },
+    {
+      name: "User",
+      description: "User profiles and accounts",
+      vectorizer: "text2vec-openai",
+      properties: [
+        {
+          name: "username",
+          dataType: "text",
+          description: "User's username",
+        },
+        {
+          name: "email",
+          dataType: "text",
+          description: "User's email address",
+        },
+        {
+          name: "profile",
+          dataType: "text",
+          description: "User profile description",
+        },
+        {
+          name: "joinedAt",
+          dataType: "date",
+          description: "Account creation date",
+        },
+      ],
+    },
+  ];
+
+  const handleApiRequest = async () => {
+    setLoading(true);
+    setResponseData("");
+    setResponseStatus(null);
+
+    // Simulate API request
+    setTimeout(() => {
+      const mockResponse = {
+        objects: [
+          {
+            id: "36ddd591-2dee-4e7e-a3cc-eb86d30a4303",
+            class: "Article",
+            properties: {
+              title: "Sample Article",
+              content: "This is a sample article content...",
+              author: "John Doe",
+              publishedAt: "2024-01-15T10:00:00Z",
+            },
+            vector: [0.1, 0.2, 0.3, 0.4, 0.5],
+          },
+        ],
+        totalResults: 1,
+      };
+
+      setResponseData(JSON.stringify(mockResponse, null, 2));
+      setResponseStatus(200);
+      setLoading(false);
+
+      // Add to history
+      const historyEntry: QueryHistory = {
+        id: Date.now().toString(),
+        type: "rest",
+        method: selectedMethod,
+        endpoint: apiEndpoint,
+        query: `${selectedMethod} ${apiEndpoint}`,
+        timestamp: new Date().toISOString(),
+        status: "success",
+      };
+      setQueryHistory([historyEntry, ...queryHistory]);
+
+      toast({
+        title: "API Request Successful",
+        description: "Request completed successfully",
+      });
+    }, 1000);
+  };
+
+  const handleGraphqlQuery = async () => {
+    setLoading(true);
+    setGraphqlResponse("");
+
+    // Simulate GraphQL request
+    setTimeout(() => {
+      const mockResponse = {
+        data: {
+          Get: {
+            Article: [
+              {
+                title: "Understanding Vector Databases",
+                content:
+                  "Vector databases are revolutionizing how we store and search data...",
+                _additional: {
+                  id: "36ddd591-2dee-4e7e-a3cc-eb86d30a4303",
+                  vector: [0.1, 0.2, 0.3, 0.4, 0.5],
+                },
+              },
+              {
+                title: "Introduction to Weaviate",
+                content: "Weaviate is an open-source vector database...",
+                _additional: {
+                  id: "47eee602-3eff-5f8f-b4dd-fc97e41b5404",
+                  vector: [0.2, 0.3, 0.4, 0.5, 0.6],
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      setGraphqlResponse(JSON.stringify(mockResponse, null, 2));
+      setLoading(false);
+
+      // Add to history
+      const historyEntry: QueryHistory = {
+        id: Date.now().toString(),
+        type: "graphql",
+        query: graphqlQuery,
+        timestamp: new Date().toISOString(),
+        status: "success",
+      };
+      setQueryHistory([historyEntry, ...queryHistory]);
+
+      toast({
+        title: "GraphQL Query Successful",
+        description: "Query executed successfully",
+      });
+    }, 1000);
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied to Clipboard",
+      description: "Content has been copied to your clipboard",
+    });
+  };
+
+  const loadFromHistory = (entry: QueryHistory) => {
+    if (entry.type === "rest") {
+      setSelectedMethod(entry.method || "GET");
+      setApiEndpoint(entry.endpoint || "");
+      setActiveTab("api-explorer");
+    } else if (entry.type === "graphql") {
+      setGraphqlQuery(entry.query);
+      setActiveTab("graphql");
+    }
+    toast({
+      title: "Query Loaded",
+      description: "Query has been loaded from history",
+    });
+  };
+
+  const toggleClassExpansion = (className: string) => {
+    const newExpanded = new Set(expandedClasses);
+    if (newExpanded.has(className)) {
+      newExpanded.delete(className);
+    } else {
+      newExpanded.add(className);
+    }
+    setExpandedClasses(newExpanded);
+  };
+
+  const getMethodColor = (method: string) => {
+    switch (method) {
+      case "GET":
+        return "bg-green-100 text-green-800";
+      case "POST":
+        return "bg-blue-100 text-blue-800";
+      case "PUT":
+        return "bg-yellow-100 text-yellow-800";
+      case "DELETE":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getDataTypeColor = (dataType: string) => {
+    switch (dataType) {
+      case "text":
+        return "bg-blue-100 text-blue-800";
+      case "number":
+        return "bg-green-100 text-green-800";
+      case "boolean":
+        return "bg-purple-100 text-purple-800";
+      case "date":
+        return "bg-orange-100 text-orange-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
   return (
     <Layout>
-      <PlaceholderPage
-        title="Developer Tools"
-        description="API explorer and GraphQL playground for development"
-      />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">
+              Developer Tools
+            </h1>
+            <p className="text-muted-foreground">
+              API explorer, GraphQL playground, and development utilities
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm">
+              <BookOpen className="h-4 w-4 mr-2" />
+              API Docs
+            </Button>
+            <Button variant="outline" size="sm">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Weaviate Console
+            </Button>
+          </div>
+        </div>
+
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-4"
+        >
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="api-explorer">API Explorer</TabsTrigger>
+            <TabsTrigger value="graphql">GraphQL</TabsTrigger>
+            <TabsTrigger value="schema">Schema Inspector</TabsTrigger>
+            <TabsTrigger value="history">Query History</TabsTrigger>
+            <TabsTrigger value="debug">Debug Tools</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="api-explorer" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Terminal className="h-5 w-5 mr-2" />
+                      REST API Explorer
+                    </CardTitle>
+                    <CardDescription>
+                      Test and explore Weaviate REST API endpoints
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex space-x-2">
+                      <Select
+                        value={selectedMethod}
+                        onValueChange={setSelectedMethod}
+                      >
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="GET">GET</SelectItem>
+                          <SelectItem value="POST">POST</SelectItem>
+                          <SelectItem value="PUT">PUT</SelectItem>
+                          <SelectItem value="DELETE">DELETE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        value={apiEndpoint}
+                        onChange={(e) => setApiEndpoint(e.target.value)}
+                        placeholder="/v1/objects"
+                        className="flex-1"
+                      />
+                      <Button onClick={handleApiRequest} disabled={loading}>
+                        {loading ? (
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+
+                    {(selectedMethod === "POST" ||
+                      selectedMethod === "PUT") && (
+                      <div className="space-y-2">
+                        <Label>Request Body</Label>
+                        <Textarea
+                          value={requestBody}
+                          onChange={(e) => setRequestBody(e.target.value)}
+                          placeholder='{"class": "Article", "properties": {...}}'
+                          rows={6}
+                          className="font-mono"
+                        />
+                      </div>
+                    )}
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Response</Label>
+                        <div className="flex items-center space-x-2">
+                          {responseStatus && (
+                            <Badge
+                              variant={
+                                responseStatus < 400 ? "default" : "destructive"
+                              }
+                            >
+                              {responseStatus}
+                            </Badge>
+                          )}
+                          {responseData && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => copyToClipboard(responseData)}
+                            >
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                      <Textarea
+                        value={responseData}
+                        readOnly
+                        rows={12}
+                        className="font-mono text-sm"
+                        placeholder="Response will appear here..."
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">API Endpoints</CardTitle>
+                    <CardDescription>Available REST endpoints</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {apiEndpoints.map((endpoint, index) => (
+                      <div
+                        key={index}
+                        className="p-2 border rounded cursor-pointer hover:bg-muted"
+                        onClick={() => {
+                          setSelectedMethod(endpoint.method);
+                          setApiEndpoint(endpoint.path);
+                        }}
+                      >
+                        <div className="flex items-center space-x-2 mb-1">
+                          <Badge
+                            variant="outline"
+                            className={getMethodColor(endpoint.method)}
+                          >
+                            {endpoint.method}
+                          </Badge>
+                          <code className="text-sm">{endpoint.path}</code>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {endpoint.description}
+                        </p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="graphql" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Code className="h-5 w-5 mr-2" />
+                    GraphQL Query
+                  </CardTitle>
+                  <CardDescription>
+                    Write and execute GraphQL queries
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Query</Label>
+                    <Textarea
+                      value={graphqlQuery}
+                      onChange={(e) => setGraphqlQuery(e.target.value)}
+                      rows={12}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Variables (JSON)</Label>
+                    <Textarea
+                      value={graphqlVariables}
+                      onChange={(e) => setGraphqlVariables(e.target.value)}
+                      rows={4}
+                      className="font-mono text-sm"
+                      placeholder="{}"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleGraphqlQuery}
+                    disabled={loading}
+                    className="w-full"
+                  >
+                    {loading ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Play className="h-4 w-4 mr-2" />
+                    )}
+                    Execute Query
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>Response</span>
+                    {graphqlResponse && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => copyToClipboard(graphqlResponse)}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    value={graphqlResponse}
+                    readOnly
+                    rows={20}
+                    className="font-mono text-sm"
+                    placeholder="Response will appear here..."
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="schema" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="lg:col-span-2">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <Database className="h-5 w-5 mr-2" />
+                      Schema Classes
+                    </CardTitle>
+                    <CardDescription>
+                      Explore your Weaviate schema and data types
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {schemaClasses.map((schemaClass) => (
+                      <Collapsible
+                        key={schemaClass.name}
+                        open={expandedClasses.has(schemaClass.name)}
+                        onOpenChange={() =>
+                          toggleClassExpansion(schemaClass.name)
+                        }
+                      >
+                        <CollapsibleTrigger className="flex items-center justify-between w-full p-3 border rounded hover:bg-muted">
+                          <div className="flex items-center space-x-2">
+                            {expandedClasses.has(schemaClass.name) ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            <span className="font-medium">
+                              {schemaClass.name}
+                            </span>
+                            <Badge variant="outline">
+                              {schemaClass.vectorizer}
+                            </Badge>
+                          </div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-3 pl-6">
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {schemaClass.description}
+                          </p>
+                          <div className="space-y-2">
+                            <h5 className="font-medium">Properties</h5>
+                            {schemaClass.properties.map((property) => (
+                              <div
+                                key={property.name}
+                                className="flex items-center justify-between p-2 bg-muted rounded"
+                              >
+                                <div>
+                                  <span className="font-mono text-sm">
+                                    {property.name}
+                                  </span>
+                                  <p className="text-xs text-muted-foreground">
+                                    {property.description}
+                                  </p>
+                                </div>
+                                <Badge
+                                  variant="outline"
+                                  className={getDataTypeColor(
+                                    property.dataType,
+                                  )}
+                                >
+                                  {property.dataType}
+                                </Badge>
+                              </div>
+                            ))}
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
+                    ))}
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Quick Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Schema
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      Import Schema
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh Schema
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Validate Schema
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Data Types</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <Badge
+                        variant="outline"
+                        className={getDataTypeColor("text")}
+                      >
+                        text
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={getDataTypeColor("number")}
+                      >
+                        number
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={getDataTypeColor("boolean")}
+                      >
+                        boolean
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={getDataTypeColor("date")}
+                      >
+                        date
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <History className="h-5 w-5 mr-2" />
+                  Query History
+                </CardTitle>
+                <CardDescription>
+                  Recent API requests and GraphQL queries
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {queryHistory.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="flex items-center justify-between p-3 border rounded hover:bg-muted cursor-pointer"
+                      onClick={() => loadFromHistory(entry)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <Badge
+                          variant="outline"
+                          className={
+                            entry.type === "rest"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-purple-100 text-purple-800"
+                          }
+                        >
+                          {entry.type.toUpperCase()}
+                        </Badge>
+                        {entry.method && (
+                          <Badge
+                            variant="outline"
+                            className={getMethodColor(entry.method)}
+                          >
+                            {entry.method}
+                          </Badge>
+                        )}
+                        <div>
+                          <p className="font-mono text-sm">
+                            {entry.type === "rest"
+                              ? entry.endpoint
+                              : entry.query.split("\n")[0]}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Badge
+                          variant={
+                            entry.status === "success"
+                              ? "default"
+                              : "destructive"
+                          }
+                        >
+                          {entry.status}
+                        </Badge>
+                        <Button size="sm" variant="ghost">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="debug" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Bug className="h-5 w-5 mr-2" />
+                    Debug Console
+                  </CardTitle>
+                  <CardDescription>
+                    Debug tools and cluster diagnostics
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Run Health Check
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Database className="h-4 w-4 mr-2" />
+                      Check Schema Consistency
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Search className="h-4 w-4 mr-2" />
+                      Validate Indexes
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Settings className="h-4 w-4 mr-2" />
+                      Test Configuration
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Performance Tools</CardTitle>
+                  <CardDescription>
+                    Monitor and optimize performance
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Terminal className="h-4 w-4 mr-2" />
+                      Query Profiler
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Export Metrics
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Clear Cache
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Generate Report
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </Layout>
   );
 }
