@@ -188,11 +188,11 @@ export default function Modules() {
 
       if (
         errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch")
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("404") ||
+        errorMessage.includes("API request failed")
       ) {
-        setError(
-          "CORS Error: Cannot connect in development mode. Showing demo data.",
-        );
+        setError("API connection error: Showing demo data.");
         const isDevelopment =
           errorMessage.includes("CORS") ||
           errorMessage.includes("Failed to fetch");
