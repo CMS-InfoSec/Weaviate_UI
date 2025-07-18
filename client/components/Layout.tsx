@@ -6,7 +6,6 @@ import {
   FileText,
   Link as LinkIcon,
   Search,
-  Puzzle,
   Archive,
   Activity,
   Settings,
