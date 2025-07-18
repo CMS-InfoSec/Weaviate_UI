@@ -102,41 +102,22 @@ export default function Modules() {
     try {
       setError(null);
 
-      // Try to fetch from /v1/meta endpoint first
-      let metaResponse: WeaviateMetaResponse | null = null;
-      try {
-        const metaUrl = API_CONFIG.buildUrl("/meta");
-        console.info("Fetching meta from:", metaUrl);
-        metaResponse = await API_CONFIG.get("/meta");
-        setWeaviateVersion(metaResponse.version || "Unknown");
-        setHostname(metaResponse.hostname || "Unknown");
-      } catch (metaError) {
-        const metaUrl = API_CONFIG.buildUrl("/meta");
-        console.error(`Failed to fetch from ${metaUrl}:`, metaError);
-        // Don't re-throw, handle gracefully and trigger fallback
-        const errorMessage =
-          metaError instanceof Error
-            ? metaError.message
-            : "Failed to fetch meta";
-        throw new Error(`Meta endpoint error: ${errorMessage}`);
-      }
+      // Fetch from /v1/meta endpoint
+      const metaUrl = API_CONFIG.buildUrl("/meta");
+      console.info("Fetching meta from:", metaUrl);
+      const metaResponse: WeaviateMetaResponse = await API_CONFIG.get("/meta");
+
+      setWeaviateVersion(metaResponse.version || "Unknown");
+      setHostname(metaResponse.hostname || "Unknown");
 
       // Try to fetch from /v1/modules endpoint for additional info (optional)
+      // This endpoint may not exist on all Weaviate versions, so we ignore errors
       let modulesResponse: WeaviateModulesResponse | null = null;
       try {
         modulesResponse = await API_CONFIG.get("/modules");
-      } catch (modulesError) {
-        // Silently handle 404 or other errors from /v1/modules endpoint
-        // This endpoint is not available on all Weaviate versions
-        console.info(
-          "/v1/modules endpoint not available, using /v1/meta only:",
-          modulesError instanceof Error ? modulesError.message : modulesError,
-        );
-      }
-
-      // Ensure we have meta response before proceeding
-      if (!metaResponse) {
-        throw new Error("Unable to fetch meta information from Weaviate");
+      } catch {
+        // Silently ignore - this endpoint is not available on all Weaviate versions
+        console.info("/v1/modules endpoint not available");
       }
 
       // Process modules from meta response
