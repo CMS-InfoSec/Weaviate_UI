@@ -97,15 +97,21 @@ export default function Modules() {
   const [weaviateVersion, setWeaviateVersion] = useState<string>("");
   const [hostname, setHostname] = useState<string>("");
 
-  // Fetch modules from /v1/meta endpoint (primary) and optionally /v1/modules
+  // Fetch modules from Weaviate endpoints
   const fetchModules = async () => {
     try {
       setError(null);
 
-      // Fetch from /v1/meta endpoint first
-      const metaResponse: WeaviateMetaResponse = await API_CONFIG.get("/meta");
-      setWeaviateVersion(metaResponse.version || "Unknown");
-      setHostname(metaResponse.hostname || "Unknown");
+      // Try to fetch from /v1/meta endpoint first
+      let metaResponse: WeaviateMetaResponse | null = null;
+      try {
+        metaResponse = await API_CONFIG.get("/meta");
+        setWeaviateVersion(metaResponse.version || "Unknown");
+        setHostname(metaResponse.hostname || "Unknown");
+      } catch (metaError) {
+        console.error("Failed to fetch from /v1/meta endpoint:", metaError);
+        throw metaError; // Re-throw to trigger fallback handling
+      }
 
       // Try to fetch from /v1/modules endpoint for additional info (optional)
       let modulesResponse: WeaviateModulesResponse | null = null;
@@ -118,6 +124,11 @@ export default function Modules() {
           "/v1/modules endpoint not available, using /v1/meta only:",
           modulesError instanceof Error ? modulesError.message : modulesError,
         );
+      }
+
+      // Ensure we have meta response before proceeding
+      if (!metaResponse) {
+        throw new Error("Unable to fetch meta information from Weaviate");
       }
 
       // Process modules from meta response
