@@ -101,6 +101,7 @@ export default function Layout({ children }: LayoutProps) {
             <h1 className="text-xl font-bold text-sidebar-foreground">
               Weaviate Admin
             </h1>
+            <ConnectionStatus />
           </div>
           <div className="px-6 pb-4">
             <ConnectionSettings />
