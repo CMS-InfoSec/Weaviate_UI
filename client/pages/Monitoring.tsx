@@ -474,7 +474,6 @@ export default function Monitoring() {
     await fetchClusterData();
     generateMetrics();
     generateAlerts();
-    generateLogs();
     setRefreshing(false);
 
     toast({
