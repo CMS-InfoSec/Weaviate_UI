@@ -24,8 +24,11 @@ import {
   AlertCircle,
   CheckCircle,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import API_CONFIG from "@/lib/api";
+import { useToast } from "@/hooks/use-toast";
 
 interface ClusterStatus {
   status: "healthy" | "warning" | "error";
