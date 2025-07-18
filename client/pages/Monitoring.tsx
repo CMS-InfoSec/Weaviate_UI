@@ -114,7 +114,6 @@ export default function Monitoring() {
   const [nodes, setNodes] = useState<ClusterNode[]>([]);
   const [metrics, setMetrics] = useState<SystemMetric[]>([]);
   const [alerts, setAlerts] = useState<LiveAlert[]>([]);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
   const [performanceData, setPerformanceData] =
     useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
