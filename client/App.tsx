@@ -32,7 +32,6 @@ const App = () => (
           <Route path="/objects" element={<Objects />} />
           <Route path="/references" element={<References />} />
           <Route path="/search" element={<Search />} />
-          <Route path="/modules" element={<Modules />} />
           <Route path="/backup" element={<Backup />} />
           <Route path="/monitoring" element={<Monitoring />} />
           <Route path="/settings" element={<Settings />} />
