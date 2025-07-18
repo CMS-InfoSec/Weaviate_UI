@@ -97,7 +97,7 @@ export default function Modules() {
   const [weaviateVersion, setWeaviateVersion] = useState<string>("");
   const [hostname, setHostname] = useState<string>("");
 
-  // Fetch modules from both /v1/meta and /v1/modules endpoints
+  // Fetch modules from /v1/meta endpoint (primary) and optionally /v1/modules
   const fetchModules = async () => {
     try {
       setError(null);
@@ -107,14 +107,16 @@ export default function Modules() {
       setWeaviateVersion(metaResponse.version || "Unknown");
       setHostname(metaResponse.hostname || "Unknown");
 
-      // Try to fetch from /v1/modules endpoint for additional info
+      // Try to fetch from /v1/modules endpoint for additional info (optional)
       let modulesResponse: WeaviateModulesResponse | null = null;
       try {
         modulesResponse = await API_CONFIG.get("/modules");
       } catch (modulesError) {
-        console.warn(
-          "Could not fetch from /v1/modules endpoint:",
-          modulesError,
+        // Silently handle 404 or other errors from /v1/modules endpoint
+        // This endpoint is not available on all Weaviate versions
+        console.info(
+          "/v1/modules endpoint not available, using /v1/meta only:",
+          modulesError instanceof Error ? modulesError.message : modulesError,
         );
       }
 
