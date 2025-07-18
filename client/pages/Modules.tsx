@@ -116,7 +116,7 @@ export default function Modules() {
 
       // Process modules from meta response
       const extractedModules: Module[] = [];
-      const metaModules = metaResponse.modules || {};
+      const metaModules = meta.modules || {};
 
       Object.entries(metaModules).forEach(([moduleName, moduleInfo]) => {
         const module: Module = {
