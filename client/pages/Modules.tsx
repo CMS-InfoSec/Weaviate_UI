@@ -208,7 +208,8 @@ export default function Modules() {
         errorMessage.includes("CORS") ||
         errorMessage.includes("Failed to fetch") ||
         errorMessage.includes("404") ||
-        errorMessage.includes("API request failed: 404")
+        errorMessage.includes("API request failed: 404") ||
+        errorMessage.includes("Meta endpoint error")
       ) {
         const isDevelopment =
           errorMessage.includes("CORS") ||
