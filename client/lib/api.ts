@@ -1,12 +1,40 @@
+// Get current connection settings from localStorage
+const getCurrentConnection = () => {
+  try {
+    const savedProfiles = localStorage.getItem("weaviate-connections");
+    if (savedProfiles) {
+      const profiles = JSON.parse(savedProfiles);
+      const defaultProfile = profiles.find((p: any) => p.isDefault);
+      if (defaultProfile) {
+        return {
+          endpoint: defaultProfile.endpoint,
+          apiKey: defaultProfile.apiKey || "",
+        };
+      }
+    }
+  } catch (error) {
+    console.warn("Failed to load connection settings:", error);
+  }
+
+  // Fallback to environment variables or defaults
+  return {
+    endpoint:
+      (process.env as any).REACT_APP_WEAVIATE_ENDPOINT ||
+      "https://weaviate.cmsinfosec.com/v1",
+    apiKey: (process.env as any).REACT_APP_WEAVIATE_API_KEY || "",
+  };
+};
+
 // API Configuration for Weaviate connection
 export const API_CONFIG = {
-  // Get Weaviate endpoint from environment variable
-  WEAVIATE_ENDPOINT:
-    (process.env as any).REACT_APP_WEAVIATE_ENDPOINT ||
-    "https://weaviate.cmsinfosec.com/v1",
+  // Get current connection dynamically
+  get WEAVIATE_ENDPOINT() {
+    return getCurrentConnection().endpoint;
+  },
 
-  // Get API key if provided
-  WEAVIATE_API_KEY: (process.env as any).REACT_APP_WEAVIATE_API_KEY || "",
+  get WEAVIATE_API_KEY() {
+    return getCurrentConnection().apiKey;
+  },
 
   // Default headers for API requests
   getHeaders: () => {
