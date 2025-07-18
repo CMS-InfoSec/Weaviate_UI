@@ -350,13 +350,13 @@ export default function Monitoring() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setRefreshing(false);
-      toast({
-        title: "Metrics Refreshed",
-        description: "Latest monitoring data has been fetched.",
-      });
-    }, 1000);
+    await fetchClusterData();
+    setRefreshing(false);
+
+    toast({
+      title: "Metrics Refreshed",
+      description: "Latest monitoring data has been fetched from Weaviate.",
+    });
   };
 
   const handleResolveAlert = (alertId: string) => {
