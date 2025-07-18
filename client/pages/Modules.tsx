@@ -105,11 +105,14 @@ export default function Modules() {
       // Try to fetch from /v1/meta endpoint first
       let metaResponse: WeaviateMetaResponse | null = null;
       try {
+        const metaUrl = API_CONFIG.buildUrl("/meta");
+        console.info("Fetching meta from:", metaUrl);
         metaResponse = await API_CONFIG.get("/meta");
         setWeaviateVersion(metaResponse.version || "Unknown");
         setHostname(metaResponse.hostname || "Unknown");
       } catch (metaError) {
-        console.error("Failed to fetch from /v1/meta endpoint:", metaError);
+        const metaUrl = API_CONFIG.buildUrl("/meta");
+        console.error(`Failed to fetch from ${metaUrl}:`, metaError);
         throw metaError; // Re-throw to trigger fallback handling
       }
 
