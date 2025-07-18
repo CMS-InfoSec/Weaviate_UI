@@ -68,307 +68,385 @@ import {
   User,
   Building,
   Hash,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
+import API_CONFIG from "@/lib/api";
 
 interface WeaviateObject {
   id: string;
-  className: string;
+  class: string;
   properties: Record<string, any>;
-  createdAt: string;
-  updatedAt: string;
+  creationTimeUnix?: number;
+  lastUpdateTimeUnix?: number;
   vector?: number[];
+  additional?: {
+    id?: string;
+    vector?: number[];
+    creationTimeUnix?: number;
+    lastUpdateTimeUnix?: number;
+  };
 }
 
 interface ClassSchema {
-  className: string;
+  class: string;
   properties: Array<{
     name: string;
-    dataType: string;
+    dataType: string | string[];
     description?: string;
   }>;
 }
 
+interface ObjectsResponse {
+  objects: WeaviateObject[];
+  totalResults?: number;
+}
+
 export default function Objects() {
-  const [objects, setObjects] = useState<WeaviateObject[]>([
-    {
-      id: "00000000-0000-0000-0000-000000000001",
-      className: "Article",
-      properties: {
-        title: "Introduction to Vector Databases",
-        content:
-          "Vector databases are becoming increasingly important for AI applications...",
-        author: "John Smith",
-        publishedDate: "2024-01-15",
-        category: "Technology",
-      },
-      createdAt: "2024-01-15T10:30:00Z",
-      updatedAt: "2024-01-15T10:30:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000002",
-      className: "Article",
-      properties: {
-        title: "Machine Learning Best Practices",
-        content:
-          "Building effective machine learning models requires careful consideration...",
-        author: "Jane Doe",
-        publishedDate: "2024-01-10",
-        category: "AI",
-      },
-      createdAt: "2024-01-10T14:20:00Z",
-      updatedAt: "2024-01-12T09:15:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000003",
-      className: "Person",
-      properties: {
-        name: "John Smith",
-        bio: "Technology writer and AI enthusiast with 10 years of experience in the field.",
-        email: "john.smith@example.com",
-        birthDate: "1985-03-15",
-      },
-      createdAt: "2024-01-08T12:00:00Z",
-      updatedAt: "2024-01-08T12:00:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000004",
-      className: "Company",
-      properties: {
-        name: "TechCorp Inc.",
-        description: "Leading technology company specializing in AI solutions.",
-        industry: "Technology",
-        foundedYear: 2015,
-      },
-      createdAt: "2024-01-05T16:45:00Z",
-      updatedAt: "2024-01-05T16:45:00Z",
-    },
-    {
-      id: "00000000-0000-0000-0000-000000000005",
-      className: "Person",
-      properties: {
-        name: "Jane Doe",
-        bio: "Machine learning researcher and data scientist.",
-        email: "jane.doe@example.com",
-        birthDate: "1990-07-22",
-      },
-      createdAt: "2024-01-03T09:30:00Z",
-      updatedAt: "2024-01-03T09:30:00Z",
-    },
-  ]);
+  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [objects, setObjects] = useState<WeaviateObject[]>([]);
+  const [schemas, setSchemas] = useState<ClassSchema[]>([]);
+  const [totalResults, setTotalResults] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(20);
 
-  const [classes] = useState<ClassSchema[]>([
-    {
-      className: "Article",
-      properties: [
-        { name: "title", dataType: "text", description: "Article title" },
-        { name: "content", dataType: "text", description: "Article content" },
-        { name: "author", dataType: "text", description: "Article author" },
-        {
-          name: "publishedDate",
-          dataType: "date",
-          description: "Publication date",
-        },
-        { name: "category", dataType: "text", description: "Article category" },
-      ],
-    },
-    {
-      className: "Person",
-      properties: [
-        { name: "name", dataType: "text", description: "Person's full name" },
-        { name: "bio", dataType: "text", description: "Biography" },
-        { name: "email", dataType: "text", description: "Email address" },
-        { name: "birthDate", dataType: "date", description: "Date of birth" },
-      ],
-    },
-    {
-      className: "Company",
-      properties: [
-        { name: "name", dataType: "text", description: "Company name" },
-        {
-          name: "description",
-          dataType: "text",
-          description: "Company description",
-        },
-        { name: "industry", dataType: "text", description: "Industry sector" },
-        { name: "foundedYear", dataType: "int", description: "Year founded" },
-      ],
-    },
-  ]);
-
+  // Filters
   const [selectedClass, setSelectedClass] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Dialogs
   const [selectedObject, setSelectedObject] = useState<WeaviateObject | null>(
     null,
   );
-  const [showAddObject, setShowAddObject] = useState(false);
-  const [showObjectDetail, setShowObjectDetail] = useState(false);
-  const [showEditObject, setShowEditObject] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showBulkImport, setShowBulkImport] = useState(false);
-  const [objectToDelete, setObjectToDelete] = useState<string | null>(null);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState<string | null>(null);
 
-  // Form state for add/edit
-  const [formData, setFormData] = useState<Record<string, any>>({});
-  const [formClass, setFormClass] = useState<string>("");
+  // Create object form
+  const [newObjectClass, setNewObjectClass] = useState("");
+  const [newObjectProperties, setNewObjectProperties] = useState<
+    Record<string, any>
+  >({});
 
+  // Fetch objects from Weaviate
+  const fetchObjects = async (page = 1, classFilter = selectedClass) => {
+    try {
+      const offset = (page - 1) * pageSize;
+      let url = `/objects?limit=${pageSize}&offset=${offset}`;
+
+      if (classFilter && classFilter !== "all") {
+        // In Weaviate, we need to use GraphQL or specific endpoints for class filtering
+        // For now, we'll fetch all and filter client-side in the fallback
+      }
+
+      const response: ObjectsResponse = await API_CONFIG.get(url);
+      const fetchedObjects = response.objects || [];
+
+      // Filter by class if specified
+      const filteredObjects =
+        classFilter && classFilter !== "all"
+          ? fetchedObjects.filter(
+              (obj) => obj.class.toLowerCase() === classFilter.toLowerCase(),
+            )
+          : fetchedObjects;
+
+      setObjects(filteredObjects);
+      setTotalResults(response.totalResults || filteredObjects.length);
+      setError(null);
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to fetch objects";
+      console.error("Objects fetch error:", errorMessage);
+
+      if (
+        errorMessage.includes("CORS") ||
+        errorMessage.includes("Failed to fetch")
+      ) {
+        setError(
+          "CORS Error: Cannot connect in development mode. Showing demo data.",
+        );
+        // Fallback demo data
+        const demoObjects: WeaviateObject[] = [
+          {
+            id: "demo-1",
+            class: "Article",
+            properties: {
+              title: "Introduction to Vector Databases (Demo)",
+              content: "Vector databases are becoming essential for AI...",
+              author: "John Doe",
+              publishedAt: "2024-01-15T10:00:00Z",
+            },
+            creationTimeUnix: Date.now() - 86400000,
+          },
+          {
+            id: "demo-2",
+            class: "Product",
+            properties: {
+              name: "Smart Headphones (Demo)",
+              description: "High-quality wireless headphones with AI features",
+              price: 299.99,
+              inStock: true,
+            },
+            creationTimeUnix: Date.now() - 43200000,
+          },
+          {
+            id: "demo-3",
+            class: "Article",
+            properties: {
+              title: "Machine Learning Best Practices (Demo)",
+              content: "Essential guidelines for ML development...",
+              author: "Jane Smith",
+              publishedAt: "2024-01-14T15:30:00Z",
+            },
+            creationTimeUnix: Date.now() - 129600000,
+          },
+        ];
+
+        // Filter demo data if class is selected
+        const filteredDemo =
+          classFilter && classFilter !== "all"
+            ? demoObjects.filter(
+                (obj) => obj.class.toLowerCase() === classFilter.toLowerCase(),
+              )
+            : demoObjects;
+
+        setObjects(filteredDemo);
+        setTotalResults(filteredDemo.length);
+
+        toast({
+          title: "Development Mode",
+          description: "CORS prevents live connection. Showing demo objects.",
+          variant: "default",
+        });
+      } else {
+        setError(errorMessage);
+        setObjects([]);
+        setTotalResults(0);
+        toast({
+          title: "Objects Error",
+          description: `Could not fetch objects: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Fetch schema for class selection
+  const fetchSchema = async () => {
+    try {
+      const schema = await API_CONFIG.get("/schema");
+      setSchemas(schema.classes || []);
+    } catch (err) {
+      console.warn("Could not fetch schema:", err);
+      // Fallback demo schemas
+      setSchemas([
+        {
+          class: "Article",
+          properties: [
+            { name: "title", dataType: ["text"] },
+            { name: "content", dataType: ["text"] },
+            { name: "author", dataType: ["text"] },
+            { name: "publishedAt", dataType: ["date"] },
+          ],
+        },
+        {
+          class: "Product",
+          properties: [
+            { name: "name", dataType: ["text"] },
+            { name: "description", dataType: ["text"] },
+            { name: "price", dataType: ["number"] },
+            { name: "inStock", dataType: ["boolean"] },
+          ],
+        },
+      ]);
+    }
+  };
+
+  // Create new object
+  const handleCreateObject = async () => {
+    if (!newObjectClass) {
+      toast({
+        title: "Validation Error",
+        description: "Please select a class for the object",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const newObject = {
+        class: newObjectClass,
+        properties: newObjectProperties,
+      };
+
+      await API_CONFIG.post("/objects", newObject);
+      await fetchObjects(currentPage, selectedClass);
+
+      setNewObjectClass("");
+      setNewObjectProperties({});
+      setShowCreateDialog(false);
+
+      toast({
+        title: "Object Created",
+        description: "Object has been created successfully.",
+      });
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create object";
+
+      if (errorMessage.includes("CORS")) {
+        // Demo mode - add to local state
+        const demoObject: WeaviateObject = {
+          id: `demo-${Date.now()}`,
+          class: newObjectClass,
+          properties: { ...newObjectProperties, "(Demo)": "Not saved" },
+          creationTimeUnix: Date.now(),
+        };
+
+        setObjects([demoObject, ...objects]);
+        setNewObjectClass("");
+        setNewObjectProperties({});
+        setShowCreateDialog(false);
+
+        toast({
+          title: "Demo Mode",
+          description:
+            "Object added locally (not saved to Weaviate due to CORS).",
+        });
+      } else {
+        toast({
+          title: "Creation Error",
+          description: `Could not create object: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Delete object
+  const handleDeleteObject = async (objectId: string) => {
+    try {
+      await API_CONFIG.delete(`/objects/${objectId}`);
+      await fetchObjects(currentPage, selectedClass);
+      setShowDeleteDialog(null);
+
+      toast({
+        title: "Object Deleted",
+        description: "Object has been deleted successfully.",
+      });
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to delete object";
+
+      if (errorMessage.includes("CORS")) {
+        // Demo mode - remove from local state
+        setObjects(objects.filter((obj) => obj.id !== objectId));
+        setShowDeleteDialog(null);
+
+        toast({
+          title: "Demo Mode",
+          description:
+            "Object removed locally (not deleted from Weaviate due to CORS).",
+        });
+      } else {
+        toast({
+          title: "Deletion Error",
+          description: `Could not delete object: ${errorMessage}`,
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  // Handle class filter change
+  const handleClassFilterChange = (value: string) => {
+    setSelectedClass(value);
+    setCurrentPage(1);
+    fetchObjects(1, value);
+  };
+
+  // Handle refresh
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchObjects(currentPage, selectedClass);
+    setRefreshing(false);
+
+    toast({
+      title: "Objects Refreshed",
+      description: "Object data has been updated from Weaviate.",
+    });
+  };
+
+  // Initial load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchSchema(), fetchObjects()]);
+      setLoading(false);
+    };
+
+    loadData();
+  }, []);
+
+  // Filter objects by search term
   const filteredObjects = objects.filter((obj) => {
-    const matchesClass =
-      selectedClass === "all" || obj.className === selectedClass;
-    const matchesSearch =
-      searchTerm === "" ||
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      obj.id.toLowerCase().includes(searchLower) ||
+      obj.class.toLowerCase().includes(searchLower) ||
       Object.values(obj.properties).some((value) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase()),
-      ) ||
-      obj.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      obj.id.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesClass && matchesSearch;
+        String(value).toLowerCase().includes(searchLower),
+      )
+    );
   });
 
-  const getClassIcon = (className: string) => {
-    switch (className) {
-      case "Article":
-        return <FileText className="h-4 w-4" />;
-      case "Person":
-        return <User className="h-4 w-4" />;
-      case "Company":
-        return <Building className="h-4 w-4" />;
-      default:
-        return <Hash className="h-4 w-4" />;
-    }
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return "Unknown";
+    return new Date(timestamp).toLocaleString();
+  };
+
+  const formatPropertyValue = (value: any): string => {
+    if (value === null || value === undefined) return "null";
+    if (typeof value === "boolean") return value.toString();
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
   };
 
   const getClassColor = (className: string) => {
-    switch (className) {
-      case "Article":
-        return "bg-blue-100 text-blue-800 border-blue-200";
-      case "Person":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Company":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
+    const colors = [
+      "bg-blue-100 text-blue-800",
+      "bg-green-100 text-green-800",
+      "bg-purple-100 text-purple-800",
+      "bg-orange-100 text-orange-800",
+      "bg-pink-100 text-pink-800",
+    ];
+    return colors[className.length % colors.length];
   };
 
-  const handleDeleteObject = (objectId: string) => {
-    setObjects(objects.filter((obj) => obj.id !== objectId));
-    setObjectToDelete(null);
-    setShowDeleteConfirm(false);
-  };
-
-  const handleAddObject = () => {
-    if (!formClass || Object.keys(formData).length === 0) return;
-
-    const newObject: WeaviateObject = {
-      id: `00000000-0000-0000-0000-${Date.now().toString().padStart(12, "0")}`,
-      className: formClass,
-      properties: { ...formData },
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setObjects([newObject, ...objects]);
-    setFormData({});
-    setFormClass("");
-    setShowAddObject(false);
-  };
-
-  const handleEditObject = () => {
-    if (!selectedObject) return;
-
-    const updatedObjects = objects.map((obj) =>
-      obj.id === selectedObject.id
-        ? {
-            ...obj,
-            properties: { ...formData },
-            updatedAt: new Date().toISOString(),
-          }
-        : obj,
+  if (loading) {
+    return (
+      <Layout>
+        <div className="p-6 space-y-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center space-y-4">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+              <div>
+                <h2 className="text-lg font-medium">Loading Objects</h2>
+                <p className="text-muted-foreground">
+                  Fetching objects from Weaviate instance...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Layout>
     );
-
-    setObjects(updatedObjects);
-    setFormData({});
-    setShowEditObject(false);
-  };
-
-  const openEditDialog = (object: WeaviateObject) => {
-    setSelectedObject(object);
-    setFormData(object.properties);
-    setFormClass(object.className);
-    setShowEditObject(true);
-  };
-
-  const renderFormFields = (classSchema: ClassSchema) => {
-    return classSchema.properties.map((property) => (
-      <div key={property.name} className="space-y-2">
-        <Label htmlFor={property.name} className="text-sm font-medium">
-          {property.name}
-          {property.description && (
-            <span className="text-xs text-muted-foreground ml-1">
-              ({property.description})
-            </span>
-          )}
-        </Label>
-        {property.dataType === "text" && property.name === "content" ? (
-          <Textarea
-            id={property.name}
-            value={formData[property.name] || ""}
-            onChange={(e) =>
-              setFormData({ ...formData, [property.name]: e.target.value })
-            }
-            placeholder={`Enter ${property.name}...`}
-            rows={4}
-          />
-        ) : property.dataType === "date" ? (
-          <Input
-            id={property.name}
-            type="date"
-            value={formData[property.name] || ""}
-            onChange={(e) =>
-              setFormData({ ...formData, [property.name]: e.target.value })
-            }
-          />
-        ) : property.dataType === "int" || property.dataType === "number" ? (
-          <Input
-            id={property.name}
-            type="number"
-            value={formData[property.name] || ""}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                [property.name]: parseInt(e.target.value) || "",
-              })
-            }
-            placeholder={`Enter ${property.name}...`}
-          />
-        ) : (
-          <Input
-            id={property.name}
-            value={formData[property.name] || ""}
-            onChange={(e) =>
-              setFormData({ ...formData, [property.name]: e.target.value })
-            }
-            placeholder={`Enter ${property.name}...`}
-          />
-        )}
-      </div>
-    ));
-  };
-
-  const formatPropertyValue = (value: any, dataType?: string) => {
-    if (value === null || value === undefined) return "-";
-
-    if (dataType === "date") {
-      return new Date(value).toLocaleDateString();
-    }
-
-    if (typeof value === "string" && value.length > 50) {
-      return value.substring(0, 50) + "...";
-    }
-
-    return String(value);
-  };
+  }
 
   return (
     <Layout>
@@ -376,409 +454,348 @@ export default function Objects() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
+            <h1 className="text-3xl font-bold tracking-tight">
               Object Management
             </h1>
-            <p className="text-muted-foreground mt-2">
-              Browse, create, edit, and delete Weaviate objects
+            <p className="text-muted-foreground">
+              Browse and manage objects in your Weaviate database
             </p>
           </div>
-          <div className="flex gap-2">
-            <Dialog open={showBulkImport} onOpenChange={setShowBulkImport}>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              size="sm"
+            >
+              <RefreshCw
+                className={`h-4 w-4 mr-2 ${refreshing ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-2" />
+              Import
+            </Button>
+            <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Bulk Import
+                <Button size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Object
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Bulk Import Objects</DialogTitle>
-                  <DialogDescription>
-                    Upload a CSV or JSON file to import multiple objects
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="importClass">Target Class</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a class" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes.map((cls) => (
-                          <SelectItem key={cls.className} value={cls.className}>
-                            {cls.className}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="importFile">File</Label>
-                    <Input type="file" accept=".csv,.json" />
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowBulkImport(false)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button>Import</Button>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={showAddObject} onOpenChange={setShowAddObject}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Object
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
                   <DialogTitle>Create New Object</DialogTitle>
                   <DialogDescription>
-                    Add a new object to your Weaviate instance
+                    Add a new object to your Weaviate database
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="objectClass">Class</Label>
-                    <Select value={formClass} onValueChange={setFormClass}>
+                    <Label>Class</Label>
+                    <Select
+                      value={newObjectClass}
+                      onValueChange={setNewObjectClass}
+                    >
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a class" />
+                        <SelectValue placeholder="Select class" />
                       </SelectTrigger>
                       <SelectContent>
-                        {classes.map((cls) => (
-                          <SelectItem key={cls.className} value={cls.className}>
-                            {cls.className}
+                        {schemas.map((schema) => (
+                          <SelectItem key={schema.class} value={schema.class}>
+                            {schema.class}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  {formClass && (
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Properties</h3>
-                      {renderFormFields(
-                        classes.find((c) => c.className === formClass)!,
-                      )}
+                  {newObjectClass && (
+                    <div className="space-y-3">
+                      <Label>Properties</Label>
+                      {schemas
+                        .find((s) => s.class === newObjectClass)
+                        ?.properties.map((prop) => (
+                          <div key={prop.name} className="space-y-1">
+                            <Label className="text-sm">{prop.name}</Label>
+                            <Input
+                              placeholder={`Enter ${prop.name}...`}
+                              value={newObjectProperties[prop.name] || ""}
+                              onChange={(e) =>
+                                setNewObjectProperties({
+                                  ...newObjectProperties,
+                                  [prop.name]: e.target.value,
+                                })
+                              }
+                            />
+                          </div>
+                        ))}
                     </div>
                   )}
-
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setShowAddObject(false);
-                        setFormData({});
-                        setFormClass("");
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button onClick={handleAddObject} disabled={!formClass}>
-                      Create Object
-                    </Button>
-                  </div>
+                </div>
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCreateDialog(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateObject}>Create Object</Button>
                 </div>
               </DialogContent>
             </Dialog>
           </div>
         </div>
 
+        {error && (
+          <Card className="border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-4">
+              <div className="flex items-center space-x-2">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <span className="text-yellow-700 font-medium">
+                  Development Mode
+                </span>
+              </div>
+              <p className="text-yellow-600 mt-2 text-sm">{error}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Filters */}
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search objects..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search objects..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            <Select
+              value={selectedClass}
+              onValueChange={handleClassFilterChange}
+            >
+              <SelectTrigger className="w-48">
+                <Filter className="h-4 w-4 mr-2" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classes</SelectItem>
+                {schemas.map((schema) => (
+                  <SelectItem key={schema.class} value={schema.class}>
+                    {schema.class}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filter by class" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Classes</SelectItem>
-              {classes.map((cls) => (
-                <SelectItem key={cls.className} value={cls.className}>
-                  {cls.className}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
+          <div className="text-sm text-muted-foreground">
+            {filteredObjects.length} of {totalResults} objects
+          </div>
         </div>
 
         {/* Objects Table */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Objects ({filteredObjects.length})
+            <CardTitle className="flex items-center">
+              <FileText className="h-5 w-5 mr-2" />
+              Objects
             </CardTitle>
             <CardDescription>
-              All objects in your Weaviate instance
+              All objects stored in your Weaviate database
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Object ID</TableHead>
-                  <TableHead>Class</TableHead>
-                  <TableHead>Properties</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredObjects.map((object) => (
-                  <TableRow key={object.id}>
-                    <TableCell className="font-mono text-sm">
-                      {object.id.substring(0, 8)}...
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getClassColor(object.className)}>
-                        <span className="flex items-center gap-1">
-                          {getClassIcon(object.className)}
-                          {object.className}
-                        </span>
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="max-w-md">
-                      <div className="space-y-1">
-                        {Object.entries(object.properties)
-                          .slice(0, 2)
-                          .map(([key, value]) => (
-                            <div key={key} className="text-sm">
-                              <span className="font-medium text-muted-foreground">
-                                {key}:
-                              </span>{" "}
-                              <span>{formatPropertyValue(value)}</span>
-                            </div>
-                          ))}
-                        {Object.keys(object.properties).length > 2 && (
-                          <span className="text-xs text-muted-foreground">
-                            +{Object.keys(object.properties).length - 2} more...
-                          </span>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(object.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(object.updatedAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedObject(object);
-                              setShowObjectDetail(true);
-                            }}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openEditDialog(object)}
-                          >
-                            <Edit className="h-4 w-4 mr-2" />
-                            Edit Object
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() =>
-                              navigator.clipboard.writeText(object.id)
-                            }
-                          >
-                            <Copy className="h-4 w-4 mr-2" />
-                            Copy ID
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => {
-                              setObjectToDelete(object.id);
-                              setShowDeleteConfirm(true);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-
-            {filteredObjects.length === 0 && (
+            {filteredObjects.length === 0 ? (
               <div className="text-center py-8">
-                <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <h3 className="text-lg font-semibold mb-2">No objects found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm || selectedClass !== "all"
-                    ? "Try adjusting your search or filter criteria"
-                    : "Create your first object to get started"}
+                <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Objects Found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm
+                    ? "No objects match your search."
+                    : selectedClass !== "all"
+                      ? `No objects found in the ${selectedClass} class.`
+                      : "No objects in your database."}
                 </p>
+                {!searchTerm && (
+                  <Button onClick={() => setShowCreateDialog(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create First Object
+                  </Button>
+                )}
               </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ID</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Properties</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredObjects.map((obj) => (
+                    <TableRow key={obj.id}>
+                      <TableCell className="font-mono text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Hash className="h-3 w-3 text-muted-foreground" />
+                          <span>{obj.id.substring(0, 8)}...</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className={getClassColor(obj.class)}
+                        >
+                          {obj.class}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="space-y-1">
+                          {Object.entries(obj.properties)
+                            .slice(0, 2)
+                            .map(([key, value]) => (
+                              <div key={key} className="text-sm">
+                                <span className="font-medium">{key}:</span>{" "}
+                                <span className="text-muted-foreground">
+                                  {formatPropertyValue(value).substring(0, 50)}
+                                  {formatPropertyValue(value).length > 50
+                                    ? "..."
+                                    : ""}
+                                </span>
+                              </div>
+                            ))}
+                          {Object.keys(obj.properties).length > 2 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{Object.keys(obj.properties).length - 2} more
+                            </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-1 text-sm text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatDate(obj.creationTimeUnix)}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuItem
+                              onClick={() => setSelectedObject(obj)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Object
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => {
+                                navigator.clipboard.writeText(
+                                  JSON.stringify(obj, null, 2),
+                                );
+                                toast({
+                                  title: "Copied",
+                                  description:
+                                    "Object data copied to clipboard",
+                                });
+                              }}
+                            >
+                              <Copy className="h-4 w-4 mr-2" />
+                              Copy JSON
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={() => setShowDeleteDialog(obj.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete Object
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
 
-        {/* Object Detail Dialog */}
-        <Dialog open={showObjectDetail} onOpenChange={setShowObjectDetail}>
-          <DialogContent className="max-w-3xl">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                {selectedObject && getClassIcon(selectedObject.className)}
-                Object Details
-              </DialogTitle>
-              <DialogDescription>
-                {selectedObject &&
-                  `${selectedObject.className} • ${selectedObject.id}`}
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedObject && (
-              <div className="space-y-6">
+        {/* Object Details Dialog */}
+        {selectedObject && (
+          <Dialog
+            open={!!selectedObject}
+            onOpenChange={() => setSelectedObject(null)}
+          >
+            <DialogContent className="max-w-4xl">
+              <DialogHeader>
+                <DialogTitle>Object Details</DialogTitle>
+                <DialogDescription>
+                  ID: {selectedObject.id} • Class: {selectedObject.class}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <Label className="font-medium">Object ID</Label>
-                    <p className="font-mono">{selectedObject.id}</p>
+                    <Label>Created</Label>
+                    <p className="text-muted-foreground">
+                      {formatDate(selectedObject.creationTimeUnix)}
+                    </p>
                   </div>
                   <div>
-                    <Label className="font-medium">Class</Label>
-                    <p>{selectedObject.className}</p>
-                  </div>
-                  <div>
-                    <Label className="font-medium">Created</Label>
-                    <p>{new Date(selectedObject.createdAt).toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <Label className="font-medium">Updated</Label>
-                    <p>{new Date(selectedObject.updatedAt).toLocaleString()}</p>
+                    <Label>Last Updated</Label>
+                    <p className="text-muted-foreground">
+                      {formatDate(selectedObject.lastUpdateTimeUnix)}
+                    </p>
                   </div>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-semibold mb-4">Properties</h3>
-                  <div className="space-y-4">
-                    {Object.entries(selectedObject.properties).map(
-                      ([key, value]) => (
-                        <div key={key} className="border rounded-lg p-3">
-                          <Label className="font-medium">{key}</Label>
-                          <p className="mt-1 text-sm">
-                            {formatPropertyValue(value)}
-                          </p>
-                        </div>
-                      ),
-                    )}
+                  <Label>Properties</Label>
+                  <div className="mt-2 p-4 bg-muted rounded-lg">
+                    <pre className="text-sm overflow-auto">
+                      {JSON.stringify(selectedObject.properties, null, 2)}
+                    </pre>
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowObjectDetail(false)}
-                  >
-                    Close
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowObjectDetail(false);
-                      openEditDialog(selectedObject);
-                    }}
-                  >
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Object
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-
-        {/* Edit Object Dialog */}
-        <Dialog open={showEditObject} onOpenChange={setShowEditObject}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Edit Object</DialogTitle>
-              <DialogDescription>
-                Update the properties of this object
-              </DialogDescription>
-            </DialogHeader>
-
-            {selectedObject && (
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm bg-muted p-3 rounded-lg">
+                {selectedObject.vector && (
                   <div>
-                    <Label className="font-medium">Object ID</Label>
-                    <p className="font-mono">{selectedObject.id}</p>
+                    <Label>
+                      Vector ({selectedObject.vector.length} dimensions)
+                    </Label>
+                    <div className="mt-2 p-4 bg-muted rounded-lg">
+                      <div className="text-sm font-mono text-muted-foreground">
+                        [{selectedObject.vector.slice(0, 5).join(", ")}
+                        {selectedObject.vector.length > 5 ? ", ..." : ""}]
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label className="font-medium">Class</Label>
-                    <p>{selectedObject.className}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Properties</h3>
-                  {renderFormFields(
-                    classes.find(
-                      (c) => c.className === selectedObject.className,
-                    )!,
-                  )}
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowEditObject(false);
-                      setFormData({});
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={handleEditObject}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </Button>
-                </div>
+                )}
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        )}
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog
-          open={showDeleteConfirm}
-          onOpenChange={setShowDeleteConfirm}
+          open={!!showDeleteDialog}
+          onOpenChange={() => setShowDeleteDialog(null)}
         >
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -789,16 +806,14 @@ export default function Objects() {
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setObjectToDelete(null)}>
-                Cancel
-              </AlertDialogCancel>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() =>
-                  objectToDelete && handleDeleteObject(objectToDelete)
+                  showDeleteDialog && handleDeleteObject(showDeleteDialog)
                 }
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                className="bg-red-600 hover:bg-red-700"
               >
-                Delete
+                Delete Object
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
