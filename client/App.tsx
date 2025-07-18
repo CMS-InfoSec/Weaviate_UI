@@ -11,7 +11,6 @@ import Schema from "./pages/Schema";
 import Objects from "./pages/Objects";
 import References from "./pages/References";
 import Search from "./pages/Search";
-import Modules from "./pages/Modules";
 import Backup from "./pages/Backup";
 import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
