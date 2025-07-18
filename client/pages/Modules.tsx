@@ -582,15 +582,6 @@ export default function Modules() {
                       {selectedModule.version || "Unknown"}
                     </p>
                   </div>
-                  <div>
-                    <Label>Enabled</Label>
-                    <Switch
-                      checked={selectedModule.enabled}
-                      onCheckedChange={() =>
-                        handleToggleModule(selectedModule.name)
-                      }
-                    />
-                  </div>
                 </div>
 
                 {selectedModule.config && (
