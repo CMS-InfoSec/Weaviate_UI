@@ -224,7 +224,7 @@ export default function SettingsPage() {
               <div className="space-y-2">
                 <h4 className="font-medium">UI Location</h4>
                 <p className="text-sm text-muted-foreground font-mono">
-                  https://ui.weaviate.cmsinfosec.com
+                  https://vectorui.cmsinfosec.com
                 </p>
               </div>
               <div className="space-y-2">
