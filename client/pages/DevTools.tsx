@@ -597,38 +597,30 @@ export default function DevTools() {
       const errorMessage =
         error instanceof Error ? error.message : "Request failed";
 
-      if (
-        errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch")
-      ) {
-        // Demo response for CORS issues
-        const mockResponse = {
-          error: "CORS Error in Development",
-          message: "This would work in production deployment",
-          demo_data: {
+      setResponseData(
+        JSON.stringify(
+          {
+            error: errorMessage,
             endpoint: apiEndpoint,
             method: selectedMethod,
-            note: "Real API response would appear here",
+            timestamp: new Date().toISOString(),
+            suggestion:
+              errorMessage.includes("CORS") ||
+              errorMessage.includes("Failed to fetch")
+                ? "Check connection settings or try a different endpoint"
+                : "Verify the endpoint URL and request format",
           },
-        };
+          null,
+          2,
+        ),
+      );
+      setResponseStatus(500);
 
-        setResponseData(JSON.stringify(mockResponse, null, 2));
-        setResponseStatus(503);
-
-        toast({
-          title: "Development Mode",
-          description: "CORS prevents live API calls. Showing demo response.",
-        });
-      } else {
-        setResponseData(JSON.stringify({ error: errorMessage }, null, 2));
-        setResponseStatus(500);
-
-        toast({
-          title: "API Request Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "API Request Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
 
       // Add error to history
       const historyEntry: QueryHistory = {
