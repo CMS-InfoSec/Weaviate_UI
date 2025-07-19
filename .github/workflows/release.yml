@@ -29,9 +29,9 @@ jobs:
         run: npm test --if-present
       - name: Build app
         run: npm run build
-        env:
+                env:
           REACT_APP_WEAVIATE_ENDPOINT: https://weaviate.cmsinfosec.com/v1
-                    PUBLIC_URL: https://vectorui.cmsinfosec.com
+          PUBLIC_URL: https://vectorui.cmsinfosec.com
       - name: Log in to registry
         uses: docker/login-action@v3
         with:
