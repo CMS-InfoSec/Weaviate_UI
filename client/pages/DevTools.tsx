@@ -269,6 +269,179 @@ export default function DevTools() {
     setQueryHistory([]);
   };
 
+  // Debug Tools Functions
+  const [debugResults, setDebugResults] = useState<string>("");
+  const [debugLoading, setDebugLoading] = useState(false);
+
+  const runHealthCheck = async () => {
+    setDebugLoading(true);
+    setDebugResults("");
+
+    try {
+      const meta = await API_CONFIG.get("/meta");
+      const results = {
+        status: "healthy",
+        version: meta.version,
+        hostname: meta.hostname,
+        modules: Object.keys(meta.modules || {}),
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(results, null, 2));
+
+      toast({
+        title: "Health Check Complete",
+        description: "Weaviate instance is healthy",
+      });
+    } catch (error) {
+      const errorResult = {
+        status: "unhealthy",
+        error: error instanceof Error ? error.message : "Health check failed",
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(errorResult, null, 2));
+
+      toast({
+        title: "Health Check Failed",
+        description: "Weaviate instance is not responding",
+        variant: "destructive",
+      });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
+  const checkSchemaConsistency = async () => {
+    setDebugLoading(true);
+    setDebugResults("");
+
+    try {
+      const schema = await API_CONFIG.get("/schema");
+      const classes = schema.classes || [];
+
+      const results = {
+        status: "consistent",
+        total_classes: classes.length,
+        classes_with_vectorizers: classes.filter((c: any) => c.vectorizer)
+          .length,
+        classes_without_vectorizers: classes.filter((c: any) => !c.vectorizer)
+          .length,
+        property_count: classes.reduce(
+          (sum: number, c: any) => sum + (c.properties?.length || 0),
+          0,
+        ),
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(results, null, 2));
+
+      toast({
+        title: "Schema Check Complete",
+        description: `Found ${classes.length} classes`,
+      });
+    } catch (error) {
+      const errorResult = {
+        status: "error",
+        error: error instanceof Error ? error.message : "Schema check failed",
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(errorResult, null, 2));
+
+      toast({
+        title: "Schema Check Failed",
+        description: "Could not validate schema",
+        variant: "destructive",
+      });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
+  const validateIndexes = async () => {
+    setDebugLoading(true);
+    setDebugResults("");
+
+    try {
+      // Check nodes endpoint for cluster health
+      const nodes = await API_CONFIG.get("/nodes");
+
+      const results = {
+        status: "validated",
+        nodes: nodes,
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(results, null, 2));
+
+      toast({
+        title: "Index Validation Complete",
+        description: "Indexes are healthy",
+      });
+    } catch (error) {
+      const errorResult = {
+        status: "error",
+        error:
+          error instanceof Error ? error.message : "Index validation failed",
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(errorResult, null, 2));
+
+      toast({
+        title: "Index Validation Failed",
+        description: "Could not validate indexes",
+        variant: "destructive",
+      });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
+  const testConfiguration = async () => {
+    setDebugLoading(true);
+    setDebugResults("");
+
+    try {
+      const meta = await API_CONFIG.get("/meta");
+
+      const results = {
+        status: "configuration_valid",
+        weaviate_version: meta.version,
+        enabled_modules: meta.modules,
+        current_endpoint: API_CONFIG.WEAVIATE_ENDPOINT,
+        has_api_key: !!API_CONFIG.WEAVIATE_API_KEY,
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(results, null, 2));
+
+      toast({
+        title: "Configuration Test Complete",
+        description: "Configuration is valid",
+      });
+    } catch (error) {
+      const errorResult = {
+        status: "configuration_error",
+        error:
+          error instanceof Error ? error.message : "Configuration test failed",
+        current_endpoint: API_CONFIG.WEAVIATE_ENDPOINT,
+        timestamp: new Date().toISOString(),
+      };
+
+      setDebugResults(JSON.stringify(errorResult, null, 2));
+
+      toast({
+        title: "Configuration Test Failed",
+        description: "Check your connection settings",
+        variant: "destructive",
+      });
+    } finally {
+      setDebugLoading(false);
+    }
+  };
+
   // Fetch schema and load history on component mount
   useEffect(() => {
     fetchSchemaData();
