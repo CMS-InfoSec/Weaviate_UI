@@ -26,7 +26,7 @@ spec:
             - name: REACT_APP_WEAVIATE_ENDPOINT
               value: "https://weaviate.cmsinfosec.com/v1"
             - name: PUBLIC_URL
-                            value: "https://vectorui.cmsinfosec.com"
+              value: "https://vectorui.cmsinfosec.com"
           resources:
             requests:
               memory: "64Mi"
@@ -96,10 +96,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - ui.weaviate.cmsinfosec.com
+        - vectorui.cmsinfosec.com
       secretName: weaviate-admin-ui-tls
   rules:
-    - host: ui.weaviate.cmsinfosec.com
+    - host: vectorui.cmsinfosec.com
       http:
         paths:
           - path: /
