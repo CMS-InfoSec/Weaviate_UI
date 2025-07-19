@@ -58,7 +58,7 @@ Create a `.env` file based on `.env.example`:
 
 ```env
 REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1
-PUBLIC_URL=https://ui.weaviate.cmsinfosec.com
+PUBLIC_URL=https://vectorui.cmsinfosec.com
 ```
 
 ### Build for Production
@@ -80,7 +80,7 @@ docker build -t weaviate-admin-ui .
 ```bash
 docker run -p 8080:8080 \
   -e REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1 \
-  -e PUBLIC_URL=https://ui.weaviate.cmsinfosec.com \
+  -e PUBLIC_URL=https://vectorui.cmsinfosec.com \
   weaviate-admin-ui
 ```
 
@@ -95,7 +95,7 @@ services:
       - "8080:8080"
     environment:
       - REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1
-      - PUBLIC_URL=https://ui.weaviate.cmsinfosec.com
+      - PUBLIC_URL=https://vectorui.cmsinfosec.com
     restart: unless-stopped
 ```
 
@@ -158,7 +158,7 @@ kubectl get certificates
 
 ### 5. Access the Application
 
-The application will be available at: https://ui.weaviate.cmsinfosec.com
+The application will be available at: https://vectorui.cmsinfosec.com
 
 ## 🔧 Configuration
 
@@ -167,7 +167,7 @@ The application will be available at: https://ui.weaviate.cmsinfosec.com
 | Variable                      | Description           | Default                              |
 | ----------------------------- | --------------------- | ------------------------------------ |
 | `REACT_APP_WEAVIATE_ENDPOINT` | Weaviate API endpoint | `https://weaviate.cmsinfosec.com/v1` |
-| `PUBLIC_URL`                  | Public URL for the UI | `https://ui.weaviate.cmsinfosec.com` |
+| `PUBLIC_URL`                  | Public URL for the UI | `https://vectorui.cmsinfosec.com` |
 | `REACT_APP_WEAVIATE_API_KEY`  | API key (if required) | -                                    |
 
 ### Kubernetes Configuration
