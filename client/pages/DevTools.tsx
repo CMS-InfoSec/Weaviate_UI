@@ -1182,32 +1182,56 @@ export default function DevTools() {
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={runHealthCheck}
+                      disabled={debugLoading}
                     >
-                      <Zap className="h-4 w-4 mr-2" />
+                      {debugLoading ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Zap className="h-4 w-4 mr-2" />
+                      )}
                       Run Health Check
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={checkSchemaConsistency}
+                      disabled={debugLoading}
                     >
-                      <Database className="h-4 w-4 mr-2" />
+                      {debugLoading ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Database className="h-4 w-4 mr-2" />
+                      )}
                       Check Schema Consistency
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={validateIndexes}
+                      disabled={debugLoading}
                     >
-                      <Search className="h-4 w-4 mr-2" />
+                      {debugLoading ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4 mr-2" />
+                      )}
                       Validate Indexes
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={testConfiguration}
+                      disabled={debugLoading}
                     >
-                      <Settings className="h-4 w-4 mr-2" />
+                      {debugLoading ? (
+                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Settings className="h-4 w-4 mr-2" />
+                      )}
                       Test Configuration
                     </Button>
                   </div>
