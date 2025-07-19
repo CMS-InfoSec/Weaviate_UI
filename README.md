@@ -4,7 +4,7 @@ A modern, production-ready React-based admin interface for Weaviate vector datab
 
 ## 🚀 Live Instance
 
-- **UI**: https://ui.weaviate.cmsinfosec.com
+- **UI**: https://vectorui.cmsinfosec.com
 - **Weaviate API**: https://weaviate.cmsinfosec.com/v1
 
 ## ✨ Features
