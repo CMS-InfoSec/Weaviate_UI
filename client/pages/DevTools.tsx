@@ -400,7 +400,7 @@ export default function DevTools() {
         timestamp: new Date().toISOString(),
         status: "success",
       };
-      setQueryHistory([historyEntry, ...queryHistory]);
+      addToHistory(historyEntry);
 
       toast({
         title: "GraphQL Query Successful",
