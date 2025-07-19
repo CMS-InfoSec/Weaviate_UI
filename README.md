@@ -2,10 +2,6 @@
 
 A modern, production-ready React-based admin interface for Weaviate vector databases. This UI provides comprehensive management capabilities including schema management, object operations, monitoring, and developer tools.
 
-## 🚀 Live Instance
-
-- **UI**: https://ui.weaviate.cmsinfosec.com
-- **Weaviate API**: https://weaviate.cmsinfosec.com/v1
 
 ## ✨ Features
 
