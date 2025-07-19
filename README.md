@@ -162,7 +162,7 @@ kubectl get certificates
 
 ### 5. Access the Application
 
-The application will be available at: https://ui.weaviate.cmsinfosec.com
+The application will be available at: https://vectorui.cmsinfosec.com
 
 ## 🔧 Configuration
 
