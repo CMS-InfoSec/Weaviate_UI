@@ -23,7 +23,7 @@ spec:
           ports:
             - containerPort: 8080
               name: http
-                    env:
+          env:
             - name: REACT_APP_WEAVIATE_ENDPOINT
               value: "https://weaviate.cmsinfosec.com/v1"
             - name: PUBLIC_URL
@@ -97,10 +97,10 @@ metadata:
 spec:
   tls:
     - hosts:
-        - ui.weaviate.cmsinfosec.com
+        - vectorui.cmsinfosec.com
       secretName: weaviate-admin-ui-tls
   rules:
-    - host: ui.weaviate.cmsinfosec.com
+    - host: vectorui.cmsinfosec.com
       http:
         paths:
           - path: /
