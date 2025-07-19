@@ -171,7 +171,7 @@ The application will be available at: https://vectorui.cmsinfosec.com
 | Variable                      | Description           | Default                              |
 | ----------------------------- | --------------------- | ------------------------------------ |
 | `REACT_APP_WEAVIATE_ENDPOINT` | Weaviate API endpoint | `https://weaviate.cmsinfosec.com/v1` |
-| `PUBLIC_URL`                  | Public URL for the UI | `https://ui.weaviate.cmsinfosec.com` |
+| `PUBLIC_URL`                  | Public URL for the UI | `https://vectorui.cmsinfosec.com`    |
 | `REACT_APP_WEAVIATE_API_KEY`  | API key (if required) | -                                    |
 
 ### Kubernetes Configuration
