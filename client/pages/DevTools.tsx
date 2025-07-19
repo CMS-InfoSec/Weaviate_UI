@@ -1097,13 +1097,26 @@ export default function DevTools() {
           <TabsContent value="history" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center">
-                  <History className="h-5 w-5 mr-2" />
-                  Query History
-                </CardTitle>
-                <CardDescription>
-                  Recent API requests and GraphQL queries
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center">
+                      <History className="h-5 w-5 mr-2" />
+                      Query History
+                    </CardTitle>
+                    <CardDescription>
+                      Recent API requests and GraphQL queries
+                    </CardDescription>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearHistory}
+                    disabled={queryHistory.length === 0}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear History
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
