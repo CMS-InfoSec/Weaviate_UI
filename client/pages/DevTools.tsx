@@ -228,9 +228,51 @@ export default function DevTools() {
     }
   };
 
-  // Fetch schema on component mount
+  // Load query history from localStorage
+  const loadQueryHistory = () => {
+    try {
+      const savedHistory = localStorage.getItem("weaviate-devtools-history");
+      if (savedHistory) {
+        const parsed = JSON.parse(savedHistory);
+        setQueryHistory(parsed);
+      }
+    } catch (error) {
+      console.warn("Failed to load query history:", error);
+    }
+  };
+
+  // Save query history to localStorage
+  const saveQueryHistory = (history: QueryHistory[]) => {
+    try {
+      // Keep only the last 50 entries
+      const limitedHistory = history.slice(0, 50);
+      localStorage.setItem(
+        "weaviate-devtools-history",
+        JSON.stringify(limitedHistory),
+      );
+      setQueryHistory(limitedHistory);
+    } catch (error) {
+      console.warn("Failed to save query history:", error);
+      setQueryHistory(history);
+    }
+  };
+
+  // Add query to history
+  const addToHistory = (entry: QueryHistory) => {
+    const newHistory = [entry, ...queryHistory];
+    saveQueryHistory(newHistory);
+  };
+
+  // Clear query history
+  const clearHistory = () => {
+    localStorage.removeItem("weaviate-devtools-history");
+    setQueryHistory([]);
+  };
+
+  // Fetch schema and load history on component mount
   useEffect(() => {
     fetchSchemaData();
+    loadQueryHistory();
   }, []);
 
   const handleApiRequest = async () => {
