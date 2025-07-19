@@ -8,7 +8,7 @@ echo "🚀 Building Weaviate Admin UI for production..."
 # Set production environment variables
 export NODE_ENV=production
 export REACT_APP_WEAVIATE_ENDPOINT=${REACT_APP_WEAVIATE_ENDPOINT:-"https://weaviate.cmsinfosec.com/v1"}
-export PUBLIC_URL=${PUBLIC_URL:-"https://ui.weaviate.cmsinfosec.com"}
+export PUBLIC_URL=${PUBLIC_URL:-"https://vectorui.cmsinfosec.com"}
 
 echo "📦 Installing dependencies..."
 npm ci --only=production
@@ -30,11 +30,11 @@ echo "📁 Server build output: dist/server/"
 
 # Display build info
 echo ""
-echo "��� Build information:"
+echo "📊 Build information:"
 echo "  Weaviate Endpoint: $REACT_APP_WEAVIATE_ENDPOINT"
 echo "  Public URL: $PUBLIC_URL"
 echo "  Build size:"
 du -sh dist/spa/ 2>/dev/null || echo "  Unable to determine build size"
 
 echo ""
-echo "🐳 Ready for Docker build!"
+echo "�� Ready for Docker build!"
