@@ -26,8 +26,8 @@ spec:
           env:
             - name: REACT_APP_WEAVIATE_ENDPOINT
               value: "https://weaviate.cmsinfosec.com/v1"
-            - name: PUBLIC_URL
-                            value: "https://vectorui.cmsinfosec.com"
+                        - name: PUBLIC_URL
+              value: "https://vectorui.cmsinfosec.com"
           resources:
             requests:
               memory: "64Mi"
