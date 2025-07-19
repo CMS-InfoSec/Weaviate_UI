@@ -115,33 +115,7 @@ export default function DevTools() {
   );
 
   // Query History State
-  const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([
-    {
-      id: "1",
-      type: "rest",
-      method: "GET",
-      endpoint: "/v1/objects",
-      query: "GET /v1/objects",
-      timestamp: "2024-01-15T14:30:00Z",
-      status: "success",
-    },
-    {
-      id: "2",
-      type: "graphql",
-      query: "{ Get { Article { title } } }",
-      timestamp: "2024-01-15T14:25:00Z",
-      status: "success",
-    },
-    {
-      id: "3",
-      type: "rest",
-      method: "POST",
-      endpoint: "/v1/objects",
-      query: "POST /v1/objects - Create Article",
-      timestamp: "2024-01-15T14:20:00Z",
-      status: "error",
-    },
-  ]);
+  const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([]);
 
   // Mock Data
   const apiEndpoints: ApiEndpoint[] = [
