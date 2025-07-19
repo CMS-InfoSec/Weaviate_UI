@@ -10,7 +10,7 @@
     "type": "git",
     "url": "https://github.com/your-org/weaviate-admin-ui.git"
   },
-  "homepage": "https://ui.weaviate.cmsinfosec.com",
+  "homepage": "https://vectorui.cmsinfosec.com",
   "pkg": {
     "assets": [
       "dist/spa/*"
