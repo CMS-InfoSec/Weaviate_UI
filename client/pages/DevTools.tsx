@@ -117,16 +117,19 @@ export default function DevTools() {
   // Query History State
   const [queryHistory, setQueryHistory] = useState<QueryHistory[]>([]);
 
-  // Mock Data
+  // Comprehensive API endpoints list
   const apiEndpoints: ApiEndpoint[] = [
+    // Core Objects API
     {
       method: "GET",
       path: "/v1/objects",
-      description: "Retrieve all objects",
+      description: "Retrieve all objects with optional filtering",
       parameters: [
         { name: "limit", type: "integer", required: false },
         { name: "offset", type: "integer", required: false },
         { name: "class", type: "string", required: false },
+        { name: "include", type: "string", required: false },
+        { name: "where", type: "string", required: false },
       ],
     },
     {
@@ -137,32 +140,133 @@ export default function DevTools() {
     {
       method: "GET",
       path: "/v1/objects/{id}",
-      description: "Retrieve object by ID",
+      description: "Retrieve specific object by ID",
+      parameters: [
+        { name: "include", type: "string", required: false },
+        { name: "additional", type: "string", required: false },
+      ],
     },
     {
       method: "PUT",
       path: "/v1/objects/{id}",
-      description: "Update an object",
+      description: "Update an existing object",
+    },
+    {
+      method: "PATCH",
+      path: "/v1/objects/{id}",
+      description: "Partially update an object",
     },
     {
       method: "DELETE",
       path: "/v1/objects/{id}",
-      description: "Delete an object",
+      description: "Delete an object by ID",
     },
+    {
+      method: "HEAD",
+      path: "/v1/objects/{id}",
+      description: "Check if object exists",
+    },
+
+    // Schema Management
     {
       method: "GET",
       path: "/v1/schema",
-      description: "Retrieve the current schema",
+      description: "Retrieve the complete schema definition",
     },
     {
       method: "POST",
       path: "/v1/schema",
-      description: "Create a new class",
+      description: "Create a new class in the schema",
+    },
+    {
+      method: "GET",
+      path: "/v1/schema/{className}",
+      description: "Get specific class definition",
+    },
+    {
+      method: "PUT",
+      path: "/v1/schema/{className}",
+      description: "Update class definition",
+    },
+    {
+      method: "DELETE",
+      path: "/v1/schema/{className}",
+      description: "Delete a class from schema",
+    },
+    {
+      method: "POST",
+      path: "/v1/schema/{className}/properties",
+      description: "Add property to a class",
+    },
+
+    // Batch Operations
+    {
+      method: "POST",
+      path: "/v1/batch/objects",
+      description: "Batch create/update objects",
+    },
+    {
+      method: "DELETE",
+      path: "/v1/batch/objects",
+      description: "Batch delete objects",
+    },
+
+    // GraphQL
+    {
+      method: "POST",
+      path: "/v1/graphql",
+      description: "Execute GraphQL queries",
+    },
+
+    // Cluster and Meta
+    {
+      method: "GET",
+      path: "/v1/meta",
+      description: "Get Weaviate instance metadata",
     },
     {
       method: "GET",
       path: "/v1/nodes",
       description: "Get cluster nodes information",
+    },
+    {
+      method: "GET",
+      path: "/v1/.well-known/ready",
+      description: "Check if Weaviate is ready",
+    },
+    {
+      method: "GET",
+      path: "/v1/.well-known/live",
+      description: "Liveness check endpoint",
+    },
+
+    // Backup Operations
+    {
+      method: "POST",
+      path: "/v1/backups/{backend}",
+      description: "Create a backup",
+    },
+    {
+      method: "GET",
+      path: "/v1/backups/{backend}",
+      description: "List available backups",
+    },
+    {
+      method: "POST",
+      path: "/v1/backups/{backend}/{backup-id}/restore",
+      description: "Restore from backup",
+    },
+
+    // Classification (if enabled)
+    {
+      method: "POST",
+      path: "/v1/classifications",
+      description: "Start a classification process",
+    },
+    {
+      method: "GET",
+      path: "/v1/classifications/{id}",
+      description: "Get classification status",
     },
   ];
 
