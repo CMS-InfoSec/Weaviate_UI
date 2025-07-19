@@ -3,7 +3,7 @@ name: Build and Publish Image
 on:
   push:
     tags:
-      - '*'
+      - "*"
 
 env:
   REGISTRY: ghcr.io
@@ -21,15 +21,15 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: "18"
+          cache: "npm"
       - name: Install dependencies
         run: npm ci
       - name: Run tests
         run: npm test --if-present
       - name: Build app
         run: npm run build
-                env:
+        env:
           REACT_APP_WEAVIATE_ENDPOINT: https://weaviate.cmsinfosec.com/v1
           PUBLIC_URL: https://vectorui.cmsinfosec.com
       - name: Log in to registry
