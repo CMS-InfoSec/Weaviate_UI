@@ -1235,6 +1235,27 @@ export default function DevTools() {
                       Test Configuration
                     </Button>
                   </div>
+
+                  {debugResults && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Debug Results</Label>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => copyToClipboard(debugResults)}
+                        >
+                          <Copy className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Textarea
+                        value={debugResults}
+                        readOnly
+                        rows={10}
+                        className="font-mono text-sm"
+                      />
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
