@@ -62,7 +62,7 @@ Create a `.env` file based on `.env.example`:
 
 ```env
 REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1
-PUBLIC_URL=https://ui.weaviate.cmsinfosec.com
+PUBLIC_URL=https://vectorui.cmsinfosec.com
 ```
 
 ### Build for Production
@@ -83,8 +83,8 @@ docker build -t weaviate-admin-ui .
 
 ```bash
 docker run -p 8080:8080 \
-  -e REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1 \
-  -e PUBLIC_URL=https://ui.weaviate.cmsinfosec.com \
+    -e REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1 \
+  -e PUBLIC_URL=https://vectorui.cmsinfosec.com \
   weaviate-admin-ui
 ```
 
@@ -98,8 +98,8 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1
-      - PUBLIC_URL=https://ui.weaviate.cmsinfosec.com
+            - REACT_APP_WEAVIATE_ENDPOINT=https://weaviate.cmsinfosec.com/v1
+      - PUBLIC_URL=https://vectorui.cmsinfosec.com
     restart: unless-stopped
 ```
 
