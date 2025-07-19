@@ -363,7 +363,7 @@ export default function DevTools() {
         timestamp: new Date().toISOString(),
         status: "error",
       };
-      setQueryHistory([historyEntry, ...queryHistory]);
+      addToHistory(historyEntry);
     } finally {
       setLoading(false);
     }
