@@ -29,7 +29,7 @@ export default defineConfig(({ mode }) => ({
         "https://weaviate.cmsinfosec.com/v1",
     ),
     "process.env.PUBLIC_URL": JSON.stringify(
-      process.env.PUBLIC_URL || "https://ui.weaviate.cmsinfosec.com",
+      process.env.PUBLIC_URL || "https://vectorui.cmsinfosec.com",
     ),
   },
 }));
