@@ -1130,6 +1130,31 @@ export default function DevTools() {
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={async () => {
+                        try {
+                          const schema = await API_CONFIG.get("/schema");
+                          const blob = new Blob(
+                            [JSON.stringify(schema, null, 2)],
+                            { type: "application/json" },
+                          );
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `weaviate-schema-${new Date().toISOString().split("T")[0]}.json`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast({
+                            title: "Schema Exported",
+                            description: "Schema has been downloaded",
+                          });
+                        } catch (error) {
+                          toast({
+                            title: "Export Failed",
+                            description: "Could not export schema",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Export Schema
@@ -1138,6 +1163,39 @@ export default function DevTools() {
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        input.accept = ".json";
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement)
+                            .files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                              try {
+                                const schema = JSON.parse(
+                                  e.target?.result as string,
+                                );
+                                // Here you would implement schema import logic
+                                toast({
+                                  title: "Schema Loaded",
+                                  description:
+                                    "Schema file loaded (import functionality would be implemented)",
+                                });
+                              } catch (error) {
+                                toast({
+                                  title: "Invalid File",
+                                  description: "Could not parse schema file",
+                                  variant: "destructive",
+                                });
+                              }
+                            };
+                            reader.readAsText(file);
+                          }
+                        };
+                        input.click();
+                      }}
                     >
                       <Upload className="h-4 w-4 mr-2" />
                       Import Schema
@@ -1146,6 +1204,13 @@ export default function DevTools() {
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={() => {
+                        fetchSchemaData();
+                        toast({
+                          title: "Schema Refreshed",
+                          description: "Schema data has been reloaded",
+                        });
+                      }}
                     >
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Refresh Schema
@@ -1154,6 +1219,7 @@ export default function DevTools() {
                       variant="outline"
                       size="sm"
                       className="w-full justify-start"
+                      onClick={checkSchemaConsistency}
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       Validate Schema
