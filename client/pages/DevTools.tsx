@@ -679,45 +679,34 @@ export default function DevTools() {
       const errorMessage =
         error instanceof Error ? error.message : "GraphQL query failed";
 
-      if (
-        errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch")
-      ) {
-        // Demo response for CORS issues
-        const mockResponse = {
-          error: "CORS Error in Development",
-          message: "GraphQL query would execute in production",
-          demo_data: {
-            query: graphqlQuery.substring(0, 100) + "...",
-            variables: graphqlVariables || "{}",
-            note: "Real GraphQL response would appear here",
+      setGraphqlResponse(
+        JSON.stringify(
+          {
+            errors: [
+              {
+                message: errorMessage,
+                timestamp: new Date().toISOString(),
+                query_preview:
+                  graphqlQuery.substring(0, 100) +
+                  (graphqlQuery.length > 100 ? "..." : ""),
+                suggestion:
+                  errorMessage.includes("CORS") ||
+                  errorMessage.includes("Failed to fetch")
+                    ? "Check connection settings in the Connection dialog"
+                    : "Verify your GraphQL query syntax and schema",
+              },
+            ],
           },
-        };
+          null,
+          2,
+        ),
+      );
 
-        setGraphqlResponse(JSON.stringify(mockResponse, null, 2));
-
-        toast({
-          title: "Development Mode",
-          description:
-            "CORS prevents live GraphQL queries. Showing demo response.",
-        });
-      } else {
-        setGraphqlResponse(
-          JSON.stringify(
-            {
-              errors: [{ message: errorMessage }],
-            },
-            null,
-            2,
-          ),
-        );
-
-        toast({
-          title: "GraphQL Query Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: "GraphQL Query Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
 
       // Add error to history
       const historyEntry: QueryHistory = {
