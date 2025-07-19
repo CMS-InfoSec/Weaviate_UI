@@ -50,6 +50,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { useToast } from "@/hooks/use-toast";
+import API_CONFIG from "@/lib/api";
 
 interface ApiEndpoint {
   method: string;
