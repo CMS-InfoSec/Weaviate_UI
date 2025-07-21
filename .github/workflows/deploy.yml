@@ -1,114 +1,53 @@
-name: Build and Deploy Weaviate Admin UI
+# .github/workflows/harbor-release.yml
+name: Build and Push to Harbor
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - '*'
+  release:
+    types: [published]
 
 env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/weaviate-admin-ui
+  IMAGE_NAME: https://harbor.cmsinfosec.com/harbor/projects/2
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
-          cache: "npm"
+          node-version: '18'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run tests
-        run: npm test -- --coverage --watchAll=false
+        run: npm test --if-present
 
-      - name: Build application
+      - name: Build app
         run: npm run build
         env:
           REACT_APP_WEAVIATE_ENDPOINT: https://weaviate.cmsinfosec.com/v1
-          PUBLIC_URL: https://vectorui.cmsinfosec.com
+          PUBLIC_URL: https://ui.weaviate.cmsinfosec.com
 
-      - name: Log in to Container Registry
-        if: github.event_name != 'pull_request'
+      - name: Log in to Harbor
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          registry: harbor.cmsinfosec.com
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
 
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        if: github.event_name != 'pull_request'
+      - name: Build and push image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up kubectl
-        uses: azure/setup-kubectl@v3
-        with:
-          version: "v1.28.0"
-
-      - name: Configure kubectl
-        run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG }}" | base64 -d > $HOME/.kube/config
-          chmod 600 $HOME/.kube/config
-
-      - name: Deploy to Kubernetes
-        run: |
-          # Update image in deployment
-          sed -i "s|image: weaviate-admin-ui:latest|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest|g" k8s/deployment.yaml
-
-          # Apply Kubernetes manifests
-          kubectl apply -f k8s/cert-manager.yaml
-          kubectl apply -f k8s/deployment.yaml
-
-          # Wait for rollout to complete
-          kubectl rollout status deployment/weaviate-admin-ui --timeout=300s
-
-          # Verify deployment
-          kubectl get pods -l app=weaviate-admin-ui
-          kubectl get ingress weaviate-admin-ui-ingress
-
-      - name: Run deployment tests
-        run: |
-          # Wait for ingress to be ready
-          sleep 30
-
-          # Test the deployment
-          curl -f https://vectorui.cmsinfosec.com/health || exit 1
-          echo "Deployment successful!"
+          tags: |
+            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.IMAGE_NAME }}:${{ github.ref_name }}
