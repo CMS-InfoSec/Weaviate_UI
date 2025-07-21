@@ -37,7 +37,7 @@ jobs:
         run: npm run build
         env:
           REACT_APP_WEAVIATE_ENDPOINT: https://weaviate.cmsinfosec.com/v1
-          PUBLIC_URL: https://ui.weaviate.cmsinfosec.com
+          PUBLIC_URL: https://vectorui.cmsinfosec.com
 
       - name: Log in to Container Registry
         if: github.event_name != 'pull_request'
@@ -110,5 +110,5 @@ jobs:
           sleep 30
 
           # Test the deployment
-          curl -f https://ui.weaviate.cmsinfosec.com/health || exit 1
+          curl -f https://vectorui.cmsinfosec.com/health || exit 1
           echo "Deployment successful!"
