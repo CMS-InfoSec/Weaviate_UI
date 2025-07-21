@@ -9,7 +9,7 @@ on:
     types: [published]
 
 env:
-  IMAGE_NAME: https://harbor.cmsinfosec.com/harbor/projects/2
+  IMAGE_NAME: harbor.cmsinfosec.com/weaviate-admin-ui
 
 jobs:
   build:

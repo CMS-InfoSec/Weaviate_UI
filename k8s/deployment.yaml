@@ -16,9 +16,11 @@ spec:
       labels:
         app: weaviate-admin-ui
     spec:
+      imagePullSecrets:
+        - name: harbor-pull-secret
       containers:
         - name: weaviate-admin-ui
-          image: weaviate-admin-ui:latest
+          image: harbor.cmsinfosec.com/weaviate-admin-ui:latest
           ports:
             - containerPort: 8080
               name: http
