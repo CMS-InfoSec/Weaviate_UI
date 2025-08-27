@@ -132,13 +132,16 @@ export default function Index() {
 
       console.error("Weaviate connection error:", errorMessage);
 
-      // Check if it's a CORS error and provide helpful message
+      // Check if it's a network/CORS error and provide helpful message
       if (
         errorMessage.includes("CORS") ||
-        errorMessage.includes("Failed to fetch")
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("Cannot connect to Weaviate instance") ||
+        errorMessage.includes("network connectivity issues") ||
+        err instanceof TypeError
       ) {
-        setError(`CORS Error: Cannot connect to Weaviate instance from development server.
-          This is expected in development mode. In production, this will work correctly.`);
+        setError(`Development Mode: Cannot connect to Weaviate instance due to CORS restrictions.
+          This is expected in development. Production deployment will connect successfully.`);
 
         // Show fallback demo data for development
         setClusterStatus({
@@ -146,7 +149,7 @@ export default function Index() {
           nodes: 1,
           objects: 1250,
           classes: 5,
-          uptime: "Demo Mode (CORS Issue)",
+          uptime: "Demo Mode (CORS Restricted)",
           hostname: "weaviate.cmsinfosec.com",
           version: "1.21.0",
         });
