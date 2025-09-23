@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  vectorui:
+    build:
+      context: .
+      args:
+        PUBLIC_URL: ${PUBLIC_URL:-https://vectorui.cominfosec.com}
+        REACT_APP_WEAVIATE_ENDPOINT: ${REACT_APP_WEAVIATE_ENDPOINT:-/v1}
+    environment:
+      WEAVIATE_UPSTREAM: ${WEAVIATE_UPSTREAM:-https://weaviate.cmsinfosec.com}
+    ports:
+      - "80:8080"
+    restart: unless-stopped
