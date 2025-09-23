@@ -19,11 +19,13 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Install security updates
-RUN apk update && apk upgrade
+# Install required packages and security updates
+RUN apk update && apk upgrade && apk add --no-cache bash curl gettext
 
-# Copy custom nginx configuration
-COPY nginx.conf /etc/nginx/nginx.conf
+# Copy nginx template and entrypoint
+COPY nginx.conf.template /etc/nginx/templates/nginx.conf.template
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist /usr/share/nginx/html
@@ -34,7 +36,10 @@ RUN addgroup -g 1001 -S nginx && \
     chown -R nginx:nginx /usr/share/nginx/html && \
     chown -R nginx:nginx /var/cache/nginx && \
     chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d
+    chown -R nginx:nginx /etc/nginx
+
+# Environment defaults
+ENV WEAVIATE_UPSTREAM=https://weaviate.cmsinfosec.com
 
 # Switch to non-root user
 USER nginx
@@ -44,7 +49,7 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/ || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Start nginx via entrypoint (renders config with env)
+ENTRYPOINT ["/docker-entrypoint.sh"]
