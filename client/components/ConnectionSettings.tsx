@@ -65,9 +65,9 @@ export default function ConnectionSettings({
   const defaultProfiles: ConnectionProfile[] = [
     {
       id: "current",
-      name: "CMS InfoSec Instance",
-      endpoint: "https://weaviate.cmsinfosec.com/v1",
-      description: "Production Weaviate instance",
+      name: "Container Proxy (/v1)",
+      endpoint: "/v1",
+      description: "Use container's built-in Nginx proxy to reach Weaviate",
       isDefault: true,
       status: "untested",
     },
