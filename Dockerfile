@@ -4,6 +4,14 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
+# Build-time arguments for client config
+ARG PUBLIC_URL
+ARG REACT_APP_WEAVIATE_ENDPOINT
+
+# Make them available to Vite during build
+ENV PUBLIC_URL=${PUBLIC_URL}
+ENV REACT_APP_WEAVIATE_ENDPOINT=${REACT_APP_WEAVIATE_ENDPOINT:-/v1}
+
 # Copy package files
 COPY package*.json ./
 
